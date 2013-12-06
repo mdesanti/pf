@@ -4,7 +4,7 @@ module Main where
 
 import Control.Monad (msum)
 import Happstack.Server(Method(GET, HEAD), dir, methodM, ServerPart, Response,
-                        toResponse, simpleHTTP, nullConf, ok, toMessage)
+                        toResponse, simpleHTTP, nullConf, ok, toMessage, look)
 import           Text.Blaze ((!))
 import qualified Text.Blaze.Html4.Strict as H
 import qualified Text.Blaze.Html4.Strict.Attributes as A
@@ -31,19 +31,34 @@ helloBlaze =
                           H.b "blaze-html!")
 
 home :: ServerPart Response
-home =
-   ok $ toResponse $
-    appTemplate "Programación Funcional"
+home = 
+  do methodM GET
+     a <- look "a"
+     ok $ toResponse $
+      appTemplate "Programación Funcional"
                 [H.meta ! A.name "keywords"
                         ! A.content "happstack, blaze, html"
                 ]
-                (H.p $ do "Trabajo práctico especial. 2013 - Segundo Cuatrimestre "
-                          H.b "Matías De Santi, Esteban Pintos")
+                (H.p "The following list shows some of the query strings")
 
 main :: IO ()
 main = simpleHTTP nullConf $ msum
-       [ do dir "home" $ do methodM [GET, HEAD] 
+       [ do dir "blaze" $ do methodM [GET, HEAD] 
             helloBlaze,
-         do methodM [GET]
-            home
+         home
        ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
