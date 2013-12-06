@@ -2,12 +2,51 @@
 
 module Main where
 
+import Control.Applicative  ((<$>), (<*>))
 import Control.Monad (msum)
 import Happstack.Server(Method(GET, HEAD), dir, methodM, ServerPart, Response,
-                        toResponse, simpleHTTP, nullConf, ok, toMessage, look)
+                        toResponse, simpleHTTP, nullConf, ok, toMessage, look,
+                        defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
+                        getDataFn, badRequest)
 import           Text.Blaze ((!))
 import qualified Text.Blaze.Html4.Strict as H
 import qualified Text.Blaze.Html4.Strict.Attributes as A
+
+
+myPolicy :: BodyPolicy
+myPolicy = (defaultBodyPolicy "/tmp/" 0 1000 1000)
+
+helloRq :: RqData (String, String)
+helloRq =
+    (,) <$> look "start" <*> look "end"
+
+main :: IO ()
+main = simpleHTTP nullConf $
+        do decodeBody myPolicy
+           msum [ do dir "blaze" $ do methodM [GET, HEAD] 
+                     helloBlaze,
+                  do dir "home" $ do methodM [GET] 
+                     handleHome
+                ]
+
+handleHome :: ServerPart Response
+handleHome = 
+    do r <- getDataFn helloRq
+       case r of
+          Left e ->
+            badRequest $ toResponse $ unlines e
+          Right(start, end) -> home start end
+
+home :: String -> String -> ServerPart Response
+home start end = ok $ toResponse $
+                      appTemplate "Programación Funcional"
+                        [H.meta ! A.name "keywords"
+                                ! A.content "happstack, blaze, html"
+                        ]
+                        (H.p $ H.toHtml ("You have requested a search from " ++ start ++ " to " ++ end))
+
+
+
 
 appTemplate :: String -> [H.Html] -> H.Html -> H.Html
 appTemplate title headers body =
@@ -29,29 +68,6 @@ helloBlaze =
                 ]
                 (H.p $ do "Hello, "
                           H.b "blaze-html!")
-
-home :: ServerPart Response
-home = 
-  do methodM GET
-     a <- look "a"
-     ok $ toResponse $
-      appTemplate "Programación Funcional"
-                [H.meta ! A.name "keywords"
-                        ! A.content "happstack, blaze, html"
-                ]
-                (H.p "The following list shows some of the query strings")
-
-main :: IO ()
-main = simpleHTTP nullConf $ msum
-       [ do dir "blaze" $ do methodM [GET, HEAD] 
-            helloBlaze,
-         home
-       ]
-
-
-
-
-
 
 
 
