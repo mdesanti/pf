@@ -11,6 +11,12 @@ import Happstack.Server(Method(GET, HEAD, POST), dir, methodM, ServerPart, Respo
 import           Text.Blaze ((!))
 import qualified Text.Blaze.Html4.Strict as H
 import qualified Text.Blaze.Html4.Strict.Attributes as A
+import System.IO
+import System.Log.Logger ( updateGlobalLogger
+                         , rootLoggerName
+                         , setLevel
+                         , Priority(..)
+                         )
 
 
 myPolicy :: BodyPolicy
@@ -25,27 +31,10 @@ main = simpleHTTP nullConf $
         do decodeBody myPolicy
            msum [ do dir "upload" $ do methodM [GET, HEAD] 
                      uploadForm,
-                  do dir "post" $ do methodM [POST]
-                     handleForm,
-                     handleHome
+                  do dir "create_post" $ do methodM [POST]
+                     handleForm
                 ]
 
------------------------------------------- HOME --------------------------------------------------------
-handleHome :: ServerPart Response
-handleHome = 
-    do r <- getDataFn helloRq
-       case r of
-          Left e -> badRequest $ toResponse $ unlines e
-          Right(start, end) -> home start end
-
-home :: String -> String -> ServerPart Response
-home start end = ok $ toResponse $
-                      appTemplate "Programación Funcional"
-                        [H.meta ! A.name "keywords"
-                                ! A.content "happstack, blaze, html"
-                        ]
-                        (H.p $ H.toHtml ("You have requested a search from " ++ start ++ " to " ++ end))
------------------------------------------- HOME --------------------------------------------------------
 
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 uploadForm :: ServerPart Response
@@ -53,22 +42,25 @@ uploadForm = ok $ toResponse $
     appTemplate "Programación Funcional" []
       (H.form ! A.enctype "multipart/form-data"
             ! A.method "POST"
-            ! A.action "/post" $ do
-               H.input ! A.type_ "file" ! A.name "file_upload" ! A.size "40"
+            ! A.action "/create_post" $ do
+               H.label "Post Title"
+               H.input ! A.type_ "text" ! A.name "post_title"
+               H.label "Post Content"
+               H.textarea ! A.type_ "text" ! A.name "name" ! A.id "name" $ ""
                H.input ! A.type_ "submit" ! A.value "upload"
       )
 
 
 handleForm :: ServerPart Response
 handleForm =
-   do r <- lookFile "file_upload"
+   do title <- look "post_title"
+      post_content <- look "post_content"
       ok $ toResponse $
-         appTemplate "Programación Funcional" [] (mkBody r)
+         appTemplate "Programación Funcional" [] (mkBody title post_content)
     where
-      mkBody (tmpFile, uploadName, contentType) = do
-        H.p (H.toHtml $ "temporary file: " ++ tmpFile)
-        H.p (H.toHtml $ "uploaded name:  " ++ uploadName)
-        H.p (H.toHtml $ "content-type:   " ++ show contentType)
+      mkBody title post_content = do
+        H.p (H.toHtml $ "Post Title: " ++ title)
+        H.p (H.toHtml $ "Post Content:  " ++ post_content)
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 
 -------------------------------------------- TEMPLATE --------------------------------------------------
@@ -84,6 +76,23 @@ appTemplate title headers body =
         body
 -------------------------------------------- TEMPLATE --------------------------------------------------
 
+
+------------------------------------------ HOME --------------------------------------------------------
+--handleHome :: ServerPart Response
+--handleHome = 
+--    do r <- getDataFn helloRq
+--       case r of
+--          Left e -> badRequest $ toResponse $ unlines e
+--          Right(start, end) -> home start end
+
+--home :: String -> String -> ServerPart Response
+--home start end = ok $ toResponse $
+--                      appTemplate "Programación Funcional"
+--                        [H.meta ! A.name "keywords"
+--                                ! A.content "happstack, blaze, html"
+--                        ]
+--                        (H.p $ H.toHtml ("You have requested a search from " ++ start ++ " to " ++ end))
+------------------------------------------ HOME --------------------------------------------------------
 
 
 
