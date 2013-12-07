@@ -123,10 +123,14 @@ main =
                                        handleEditForm acid,
                                     do dir "allPosts" $ do methodM [GET]
                                        handleAllPosts acid,
-                                    do dir "posts" $ do dir "delete" $ do path $ (\s -> handleDeletePost acid s),
-                                    do dir "posts" $ do path $ (\s -> showPost acid s),
-                                    do dir "update_post" $ do path $ (\s -> editForm acid s),
-                                    home acid
+                                    do dir "posts" $ do dir "delete" $ do path $ (\s -> do methodM [POST] 
+                                                                                           handleDeletePost acid s),
+                                    do dir "posts" $ do path $ (\s -> do
+                                                                        methodM [GET]
+                                                                        showPost acid s),
+                                    do dir "update_post" $ do path $ (\s -> do methodM [POST]
+                                                                               editForm acid s),
+                                    seeOther ("/allPosts" :: String) (toResponse ())
                                   ])
 ------------------------------------------ MAIN --------------------------------------------------------
 
@@ -215,12 +219,15 @@ buildShowResponse (BlogPost key post_title post_content) =
           []
           (do H.h1 (H.toHtml ("Showing " ++ post_title))
               H.p (H.toHtml post_content)
-              H.a ! (buildDeleteLink key) $ "Remove"
+              buildDeleteLink key
           )
     ))
 
-buildDeleteLink :: PostId -> H.Attribute
-buildDeleteLink (PostId key) = A.href (stringValue ("/posts/delete/" ++ show key))
+buildDeleteLink :: PostId -> H.Html
+buildDeleteLink (PostId key) = H.form
+                                ! A.method "POST"
+                                ! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
+                                   H.input ! A.type_ "submit" ! A.value "Delete"
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
