@@ -1,9 +1,14 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP, DeriveDataTypeable, FlexibleContexts,
+  GeneralizedNewtypeDeriving, MultiParamTypeClasses,
+  TemplateHaskell, TypeFamilies, RecordWildCards #-}
 
 module Main where
 
 import Control.Applicative  ((<$>), (<*>))
-import Control.Monad (msum)
+import Control.Monad
+import Control.Monad.State
+import Control.Monad.Reader ( ask )
+import Control.Exception    ( bracket )
 import Happstack.Server(Method(GET, HEAD, POST), dir, methodM, ServerPart, Response,
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
@@ -17,28 +22,64 @@ import System.Log.Logger ( updateGlobalLogger
                          , setLevel
                          , Priority(..)
                          )
+import Data.Data            ( Data, Typeable )
+import Data.Acid            ( AcidState, Query, Update
+                            , makeAcidic, openLocalState )
+import Data.Acid.Advanced   ( query', update' )
+import Data.Acid.Local      ( createCheckpointAndClose )
+import Data.SafeCopy        ( base, deriveSafeCopy )
 
+------------------------------------------ POST DEFINITION ---------------------------------------------
+
+data BlogPost = BlogPost { title :: String, content :: String } deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+data Posts = Posts { all_posts :: [BlogPost]} deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+$(deriveSafeCopy 0 'base ''BlogPost)
+$(deriveSafeCopy 0 'base ''Posts)
+
+initialPostsState :: Posts
+initialPostsState = Posts []
+
+addPost :: BlogPost -> Update Posts [BlogPost]
+addPost post =
+    do c@Posts{..} <- get
+       put $ c { all_posts = post:all_posts }
+       return all_posts
+
+allPosts :: Query Posts [BlogPost]
+allPosts = all_posts <$> ask
+
+$(makeAcidic ''Posts ['addPost, 'allPosts])
+
+------------------------------------------ POST DEFINITION ---------------------------------------------
 
 myPolicy :: BodyPolicy
 myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
 
-helloRq :: RqData (String, String)
-helloRq =
-    (,) <$> look "start" <*> look "end"
-
 main :: IO ()
-main = simpleHTTP nullConf $
-        do decodeBody myPolicy
-           msum [ do dir "upload" $ do methodM [GET, HEAD] 
-                     uploadForm,
-                  do dir "create_post" $ do methodM [POST]
-                     handleForm
-                ]
+main = 
+  do updateGlobalLogger rootLoggerName (setLevel INFO)
+     bracket (openLocalState initialPostsState)
+             (createCheckpointAndClose)
+              (\acid -> simpleHTTP nullConf $
+                          do decodeBody myPolicy
+                             msum [ do dir "upload" $ do methodM [GET, HEAD] 
+                                       uploadForm acid,
+                                    do dir "create_post" $ do methodM [POST]
+                                       handleForm acid,
+                                    home acid
+                                  ])
 
 
 ------------------------------------------ POST UPLOAD -------------------------------------------------
-uploadForm :: ServerPart Response
-uploadForm = ok $ toResponse $
+
+postRq :: RqData (String, String)
+postRq =
+    (,) <$> look "post_title" <*> look "post_content"
+
+uploadForm :: AcidState Posts -> ServerPart Response
+uploadForm acid = ok $ toResponse $
     appTemplate "Programación Funcional" []
       (H.form ! A.enctype "multipart/form-data"
             ! A.method "POST"
@@ -46,21 +87,24 @@ uploadForm = ok $ toResponse $
                H.label "Post Title"
                H.input ! A.type_ "text" ! A.name "post_title"
                H.label "Post Content"
-               H.textarea ! A.type_ "text" ! A.name "name" ! A.id "name" $ ""
+               H.textarea ! A.type_ "text" ! A.name "post_content" ! A.id "name" $ ""
                H.input ! A.type_ "submit" ! A.value "upload"
       )
 
 
-handleForm :: ServerPart Response
-handleForm =
-   do title <- look "post_title"
-      post_content <- look "post_content"
-      ok $ toResponse $
-         appTemplate "Programación Funcional" [] (mkBody title post_content)
-    where
-      mkBody title post_content = do
-        H.p (H.toHtml $ "Post Title: " ++ title)
-        H.p (H.toHtml $ "Post Content:  " ++ post_content)
+handleForm :: AcidState Posts -> ServerPart Response
+handleForm acid =
+   do post_data <- getDataFn postRq
+      case post_data of
+        Left e -> badRequest (toResponse (unlines e))
+        Right(post_title, post_content) -> 
+                                          do c <- update' acid (AddPost (BlogPost post_title post_content))
+                                             ok $ toResponse $ 
+                                               appTemplate "Programación Funcional" [] (mkBody post_title post_content)      
+                                                 where
+                                                   mkBody post_title post_content = do
+                                                     H.p (H.toHtml $ "Post Title: " ++ post_title)
+                                                     H.p (H.toHtml $ "Post Content:  " ++ post_content)
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 
 -------------------------------------------- TEMPLATE --------------------------------------------------
@@ -78,20 +122,15 @@ appTemplate title headers body =
 
 
 ------------------------------------------ HOME --------------------------------------------------------
---handleHome :: ServerPart Response
---handleHome = 
---    do r <- getDataFn helloRq
---       case r of
---          Left e -> badRequest $ toResponse $ unlines e
---          Right(start, end) -> home start end
-
---home :: String -> String -> ServerPart Response
---home start end = ok $ toResponse $
---                      appTemplate "Programación Funcional"
---                        [H.meta ! A.name "keywords"
---                                ! A.content "happstack, blaze, html"
---                        ]
---                        (H.p $ H.toHtml ("You have requested a search from " ++ start ++ " to " ++ end))
+home :: AcidState Posts -> ServerPart Response
+home acid = 
+      do posts <- query' acid AllPosts
+         ok $ toResponse $
+            appTemplate "Programación Funcional"
+              [H.meta ! A.name "keywords"
+                      ! A.content "happstack, blaze, html"
+              ]
+              (H.p $ H.toHtml ("A ver... " ++ show (length posts)))
 ------------------------------------------ HOME --------------------------------------------------------
 
 
