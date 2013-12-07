@@ -13,7 +13,8 @@ import Happstack.Server(Method(GET, HEAD, POST), dir, methodM, ServerPart, Respo
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
                         getDataFn, badRequest, lookFile)
-import           Text.Blaze ((!))
+import           Text.Blaze
+import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
 import qualified Text.Blaze.Html4.Strict.Attributes as A
 import System.IO
@@ -105,13 +106,13 @@ handleForm acid =
       case post_data of
         Left e -> badRequest (toResponse (unlines e))
         Right(post_title, post_content) -> 
-                                          do c <- update' acid (AddPost (BlogPost post_title post_content))
-                                             ok $ toResponse $ 
-                                               appTemplate "Programación Funcional" [] (mkBody post_title post_content)      
-                                                 where
-                                                   mkBody post_title post_content = do
-                                                     H.p (H.toHtml $ "Post Title: " ++ post_title)
-                                                     H.p (H.toHtml $ "Post Content:  " ++ post_content)
+                    do c <- update' acid (AddPost (BlogPost post_title post_content))
+                       ok $ toResponse $ 
+                         appTemplate "Programación Funcional" [] (mkBody post_title post_content)      
+                           where
+                             mkBody post_title post_content = do
+                               H.p (H.toHtml $ "Post Title: " ++ post_title)
+                               H.p (H.toHtml $ "Post Content:  " ++ post_content)
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 
 -------------------------------------------- TEMPLATE --------------------------------------------------
@@ -140,8 +141,11 @@ buildResponse posts =
         appTemplate "Programación Funcional"
           []
           (do H.h1 "All posts"
-              H.ul $ forM_ posts (H.li . H.toHtml . getName))
+              H.ul $ forM_ posts (H.li . (\name -> H.a ! (buildLink name) $ H.toHtml name) . getName))
     ))
+
+buildLink :: String -> H.Attribute
+buildLink name = A.href (stringValue ("/posts/" ++ name))
 
 ------------------------------------------ SHOW ALL POSTS ----------------------------------------------
 
