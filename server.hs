@@ -35,6 +35,11 @@ data BlogPost = BlogPost { title :: String, content :: String } deriving (Eq, Or
 
 data Posts = Posts { all_posts :: [BlogPost]} deriving (Eq, Ord, Read, Show, Data, Typeable)
 
+getName (BlogPost title content) = title
+getContent (BlogPost title content) = content
+
+------------------------------------------ POST DEFINITION ---------------------------------------------
+------------------------------------------ ACID CONFIGURATION-------------------------------------------
 $(deriveSafeCopy 0 'base ''BlogPost)
 $(deriveSafeCopy 0 'base ''Posts)
 
@@ -52,7 +57,7 @@ allPosts = all_posts <$> ask
 
 $(makeAcidic ''Posts ['addPost, 'allPosts])
 
------------------------------------------- POST DEFINITION ---------------------------------------------
+------------------------------------------ ACID CONFIGURATION-------------------------------------------
 
 myPolicy :: BodyPolicy
 myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
@@ -68,6 +73,8 @@ main =
                                        uploadForm acid,
                                     do dir "create_post" $ do methodM [POST]
                                        handleForm acid,
+                                    do dir "allPosts" $ do methodM [GET]
+                                       handleAllPosts acid,
                                     home acid
                                   ])
 
@@ -119,6 +126,24 @@ appTemplate title headers body =
       H.body $ do
         body
 -------------------------------------------- TEMPLATE --------------------------------------------------
+
+------------------------------------------ SHOW ALL POSTS ----------------------------------------------
+
+handleAllPosts :: AcidState Posts -> ServerPart Response
+handleAllPosts acid = 
+  do posts <- query' acid AllPosts
+     buildResponse posts
+
+buildResponse :: [BlogPost] -> ServerPart Response
+buildResponse posts = 
+  ok (toResponse (
+        appTemplate "Programación Funcional"
+          []
+          (do H.h1 "All posts"
+              H.ul $ forM_ posts (H.li . H.toHtml . getName))
+    ))
+
+------------------------------------------ SHOW ALL POSTS ----------------------------------------------
 
 
 ------------------------------------------ HOME --------------------------------------------------------
