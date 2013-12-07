@@ -9,10 +9,10 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader ( ask )
 import Control.Exception    ( bracket )
-import Happstack.Server(Method(GET, HEAD, POST), dir, methodM, ServerPart, Response,
+import Happstack.Server(Method(GET, HEAD, POST, DELETE), dir, methodM, ServerPart, Response,
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look, lookRead,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
-                        getDataFn, badRequest, lookFile, path, resp)
+                        getDataFn, badRequest, lookFile, path, resp, seeOther, method)
 import           Text.Blaze
 import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
@@ -83,7 +83,7 @@ getPost key =
        return (getOne (posts @= key))
 
 
-allPosts :: Query Blog  [BlogPost]
+allPosts :: Query Blog [BlogPost]
 allPosts = do
              Blog{..} <- ask
              let all_posts = IxSet.toList posts
@@ -95,8 +95,12 @@ updatePost (BlogPost key title content) = do
   put $ b { posts =
              IxSet.updateIx key (BlogPost key title content) posts
           }
+deletePost :: BlogPost -> Update Blog ()
+deletePost post = do
+  b@Blog{..} <- get
+  put $ b { posts = IxSet.delete post posts}
 
-$(makeAcidic ''Blog ['addPost, 'allPosts, 'getPost, 'updatePost])
+$(makeAcidic ''Blog ['addPost, 'allPosts, 'getPost, 'updatePost, 'deletePost])
 
 ------------------------------------------ ACID CONFIGURATION ------------------------------------------
 ------------------------------------------ MAIN --------------------------------------------------------
@@ -119,6 +123,7 @@ main =
                                        handleEditForm acid,
                                     do dir "allPosts" $ do methodM [GET]
                                        handleAllPosts acid,
+                                    do dir "posts" $ do dir "delete" $ do path $ (\s -> handleDeletePost acid s),
                                     do dir "posts" $ do path $ (\s -> showPost acid s),
                                     do dir "update_post" $ do path $ (\s -> editForm acid s),
                                     home acid
@@ -157,13 +162,8 @@ handleNewForm acid =
       case post_data of
         Left e -> badRequest (toResponse (unlines e))
         Right(post_title, post_content, post_id) -> 
-                    do c <- update' acid (AddPost post_title post_content)
-                       ok $ toResponse $ 
-                         appTemplate "Programación Funcional" [] (mkBody post_title post_content)      
-                           where
-                             mkBody post_title post_content = do
-                               H.p (H.toHtml $ "Post Title: " ++ post_title)
-                               H.p (H.toHtml $ "Post Content:  " ++ post_content)
+                    do (BlogPost (PostId post_id) title content) <- update' acid (AddPost post_title post_content)
+                       seeOther ("/posts/" ++ show post_id) (toResponse ())
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 
 ------------------------------------------ POST UPDATE -------------------------------------------------
@@ -176,20 +176,14 @@ editForm acid key =
                         Just (BlogPost a b c) -> createForm acid (BlogPost a b c) "/update_post"
                         Nothing -> badRequest (toResponse (("Could not find post with id " ++ show key) :: String))
 
-
 handleEditForm :: AcidState Blog -> ServerPart Response
 handleEditForm acid =
    do post_data <- getDataFn postRq
       case post_data of
         Left e -> badRequest (toResponse (unlines e))
         Right(post_title, post_content, post_id) -> 
-                    do c <- update' acid (UpdatePost (BlogPost (PostId post_id) post_title post_content))
-                       ok $ toResponse $ 
-                         appTemplate "Programación Funcional" [] (mkBody post_title post_content)      
-                           where
-                             mkBody post_title post_content = do
-                               H.p (H.toHtml $ "Post Title: " ++ post_title)
-                               H.p (H.toHtml $ "Post Content:  " ++ post_content)
+                    do post <- update' acid (UpdatePost (BlogPost (PostId post_id) post_title post_content))
+                       seeOther ("/posts/" ++ show post_id) (toResponse ())
 ------------------------------------------ POST UPDATE -------------------------------------------------
 
 -------------------------------------------- TEMPLATE --------------------------------------------------
@@ -215,16 +209,33 @@ showPost acid post_id =
                   Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 buildShowResponse :: BlogPost -> ServerPart Response
-buildShowResponse (BlogPost _ post_title post_content) = 
+buildShowResponse (BlogPost key post_title post_content) = 
   ok (toResponse (
         appTemplate "Programación Funcional"
           []
           (do H.h1 (H.toHtml ("Showing " ++ post_title))
               H.p (H.toHtml post_content)
+              H.a ! (buildDeleteLink key) $ "Remove"
           )
     ))
 
+buildDeleteLink :: PostId -> H.Attribute
+buildDeleteLink (PostId key) = A.href (stringValue ("/posts/delete/" ++ show key))
+
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
+
+------------------------------------------ DELETE POST ------------------------------------------------
+
+handleDeletePost :: AcidState Blog -> Integer -> ServerPart Response
+handleDeletePost acid post_id = 
+            do to_delete <- query' acid (GetPost (PostId post_id))
+               case to_delete of
+                Just blog_post -> do 
+                                    update' acid (DeletePost blog_post)
+                                    seeOther ("/allPosts" :: String) (toResponse ())
+                Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
+
+------------------------------------------ DELETE POST ------------------------------------------------
 
 ------------------------------------------ SHOW ALL POSTS ----------------------------------------------
 
