@@ -125,14 +125,10 @@ main =
                                   ])
 ------------------------------------------ MAIN --------------------------------------------------------
 
------------------------------------------- POST UPLOAD -------------------------------------------------
-
+------------------------------------------ COMMON POST FORM --------------------------------------------
 postRq :: RqData (String, String, Integer)
 postRq =
     (,,) <$> look "post_title" <*> look "post_content" <*> lookRead "post_id"
-
-newForm :: AcidState Blog -> ServerPart Response
-newForm acid = createForm acid (BlogPost (PostId 0) "" "") "/create_post"
 
 
 createForm :: AcidState Blog -> BlogPost -> String -> ServerPart Response
@@ -148,7 +144,12 @@ createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse
                H.input ! A.type_ "hidden" ! A.name "post_id" ! A.value (stringValue (show key))
                H.input ! A.type_ "submit" ! A.value "upload"
       )
+------------------------------------------ COMMON POST FORM --------------------------------------------
 
+------------------------------------------ POST UPLOAD -------------------------------------------------
+
+newForm :: AcidState Blog -> ServerPart Response
+newForm acid = createForm acid (BlogPost (PostId 0) "" "") "/create_post"
 
 handleNewForm :: AcidState Blog -> ServerPart Response
 handleNewForm acid =
