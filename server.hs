@@ -12,7 +12,7 @@ import Control.Exception    ( bracket )
 import Happstack.Server(Method(GET, HEAD, POST), dir, methodM, ServerPart, Response,
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
-                        getDataFn, badRequest, lookFile)
+                        getDataFn, badRequest, lookFile, path, resp)
 import           Text.Blaze
 import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
@@ -28,37 +28,71 @@ import Data.Acid            ( AcidState, Query, Update
                             , makeAcidic, openLocalState )
 import Data.Acid.Advanced   ( query', update' )
 import Data.Acid.Local      ( createCheckpointAndClose )
-import Data.SafeCopy        ( base, deriveSafeCopy )
+import Data.SafeCopy        ( SafeCopy, base, deriveSafeCopy )
+import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
+                            , Proxy(..), getOne, ixFun, ixSet )
+import qualified Data.IxSet as IxSet
 
 ------------------------------------------ POST DEFINITION ---------------------------------------------
 
-data BlogPost = BlogPost { title :: String, content :: String } deriving (Eq, Ord, Read, Show, Data, Typeable)
+newtype PostId = PostId { unPostId :: Integer } deriving (Eq, Ord, Show, Read, Data, Enum, Typeable)
 
-data Posts = Posts { all_posts :: [BlogPost]} deriving (Eq, Ord, Read, Show, Data, Typeable)
+data BlogPost = BlogPost { postId :: PostId, title :: String, content :: String } deriving (Eq, Ord, Read, Show, Data, Typeable)
 
-getName (BlogPost title content) = title
-getContent (BlogPost title content) = content
+instance Indexable BlogPost where
+  empty = ixSet
+    [ ixFun $ \bp -> [ postId bp ]]
+
+data Blog = Blog
+    { nextPostId :: PostId
+    , posts      :: IxSet BlogPost
+    }
+    deriving (Data, Typeable)
+
+getName (BlogPost _ title content) = title
+getContent (BlogPost _ title content) = content
+getId (BlogPost key _ _) = key
 
 ------------------------------------------ POST DEFINITION ---------------------------------------------
 ------------------------------------------ ACID CONFIGURATION-------------------------------------------
+$(deriveSafeCopy 0 'base ''PostId)
 $(deriveSafeCopy 0 'base ''BlogPost)
-$(deriveSafeCopy 0 'base ''Posts)
+$(deriveSafeCopy 0 'base ''Blog)
 
-initialPostsState :: Posts
-initialPostsState = Posts []
+initialBlogState :: Blog
+initialBlogState =
+    Blog { nextPostId = PostId 1
+         , posts      = empty
+         }
 
-addPost :: BlogPost -> Update Posts [BlogPost]
-addPost post =
-    do c@Posts{..} <- get
-       put $ c { all_posts = post:all_posts }
-       return all_posts
+addPost :: String -> String -> Update Blog BlogPost
+addPost post_title post_content =
+    do b@Blog{..} <- get
+       let post = BlogPost { postId = nextPostId
+                             , title  = post_title
+                             , content = post_content
+                           }
+       put $ b { nextPostId = succ nextPostId
+               , posts      = IxSet.insert post posts
+               }
+       return post
 
-allPosts :: Query Posts [BlogPost]
-allPosts = all_posts <$> ask
+getPost :: PostId -> Query Blog (Maybe BlogPost)
+getPost key = 
+    do Blog{..} <- ask
+       return $ getOne $ posts @= key
 
-$(makeAcidic ''Posts ['addPost, 'allPosts])
 
------------------------------------------- ACID CONFIGURATION-------------------------------------------
+allPosts :: Query Blog  [BlogPost]
+allPosts = do
+             Blog{..} <- ask
+             let all_posts = IxSet.toList posts
+             return all_posts
+
+$(makeAcidic ''Blog ['addPost, 'allPosts, 'getPost])
+
+------------------------------------------ ACID CONFIGURATION ------------------------------------------
+------------------------------------------ MAIN --------------------------------------------------------
 
 myPolicy :: BodyPolicy
 myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
@@ -66,7 +100,7 @@ myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
 main :: IO ()
 main = 
   do updateGlobalLogger rootLoggerName (setLevel INFO)
-     bracket (openLocalState initialPostsState)
+     bracket (openLocalState initialBlogState)
              (createCheckpointAndClose)
               (\acid -> simpleHTTP nullConf $
                           do decodeBody myPolicy
@@ -76,9 +110,10 @@ main =
                                        handleForm acid,
                                     do dir "allPosts" $ do methodM [GET]
                                        handleAllPosts acid,
+                                    do dir "posts" $ do path $ (\s -> showPost acid s),
                                     home acid
                                   ])
-
+------------------------------------------ MAIN --------------------------------------------------------
 
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 
@@ -86,7 +121,7 @@ postRq :: RqData (String, String)
 postRq =
     (,) <$> look "post_title" <*> look "post_content"
 
-uploadForm :: AcidState Posts -> ServerPart Response
+uploadForm :: AcidState Blog -> ServerPart Response
 uploadForm acid = ok $ toResponse $
     appTemplate "Programación Funcional" []
       (H.form ! A.enctype "multipart/form-data"
@@ -100,13 +135,13 @@ uploadForm acid = ok $ toResponse $
       )
 
 
-handleForm :: AcidState Posts -> ServerPart Response
+handleForm :: AcidState Blog -> ServerPart Response
 handleForm acid =
    do post_data <- getDataFn postRq
       case post_data of
         Left e -> badRequest (toResponse (unlines e))
         Right(post_title, post_content) -> 
-                    do c <- update' acid (AddPost (BlogPost post_title post_content))
+                    do c <- update' acid (AddPost post_title post_content)
                        ok $ toResponse $ 
                          appTemplate "Programación Funcional" [] (mkBody post_title post_content)      
                            where
@@ -128,9 +163,30 @@ appTemplate title headers body =
         body
 -------------------------------------------- TEMPLATE --------------------------------------------------
 
+------------------------------------------ SHOW ONE POST ----------------------------------------------
+
+showPost :: AcidState Blog -> Integer -> ServerPart Response
+showPost acid post_id =
+            do post <- query' acid (GetPost (PostId post_id))
+               case post of
+                  Just post -> buildShowResponse post
+                  Nothing -> badRequest (toResponse ("Hola" :: String))
+
+buildShowResponse :: BlogPost -> ServerPart Response
+buildShowResponse (BlogPost _ post_title post_content) = 
+  ok (toResponse (
+        appTemplate "Programación Funcional"
+          []
+          (do H.h1 (H.toHtml ("Showing " ++ post_title))
+              H.p (H.toHtml post_content)
+          )
+    ))
+
+------------------------------------------ SHOW ONE POST ----------------------------------------------
+
 ------------------------------------------ SHOW ALL POSTS ----------------------------------------------
 
-handleAllPosts :: AcidState Posts -> ServerPart Response
+handleAllPosts :: AcidState Blog -> ServerPart Response
 handleAllPosts acid = 
   do posts <- query' acid AllPosts
      buildResponse posts
@@ -141,17 +197,17 @@ buildResponse posts =
         appTemplate "Programación Funcional"
           []
           (do H.h1 "All posts"
-              H.ul $ forM_ posts (H.li . (\name -> H.a ! (buildLink name) $ H.toHtml name) . getName))
+              H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
     ))
 
-buildLink :: String -> H.Attribute
-buildLink name = A.href (stringValue ("/posts/" ++ name))
+buildLink :: PostId -> H.Attribute
+buildLink (PostId key) = A.href (stringValue ("/posts/" ++ (show key)))
 
 ------------------------------------------ SHOW ALL POSTS ----------------------------------------------
 
 
 ------------------------------------------ HOME --------------------------------------------------------
-home :: AcidState Posts -> ServerPart Response
+home :: AcidState Blog -> ServerPart Response
 home acid = 
       do posts <- query' acid AllPosts
          ok $ toResponse $
