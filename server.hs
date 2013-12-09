@@ -32,6 +32,9 @@ import Data.SafeCopy        ( SafeCopy, base, deriveSafeCopy )
 import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
                             , Proxy(..), getOne, ixFun, ixSet )
 import qualified Data.IxSet as IxSet
+import Happstack.Server.FileServe
+
+
 
 ------------------------------------------ POST DEFINITION ---------------------------------------------
 
@@ -115,7 +118,9 @@ main =
              (createCheckpointAndClose)
               (\acid -> simpleHTTP nullConf $
                           do decodeBody myPolicy
-                             msum [ do dir "upload" $ do methodM [GET, HEAD] 
+                             msum [ 
+                                    do dir "static" $ do serveDirectory DisableBrowsing [] "public",
+                                    do dir "upload" $ do methodM [GET, HEAD] 
                                        newForm acid,
                                     do dir "create_post" $ do methodM [POST]
                                        handleNewForm acid,
@@ -143,7 +148,7 @@ postRq =
 createForm :: AcidState Blog -> BlogPost -> String -> ServerPart Response
 createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse $
     appTemplate "Programación Funcional" []
-      (H.form ! A.enctype "multipart/form-data"
+      (H.form ! A.enctype "multipart/form-data" ! A.class_ "form-horizontal"
             ! A.method "POST"
             ! A.action (stringValue post_url) $ do
                H.label "Post Title"
@@ -194,6 +199,7 @@ handleEditForm acid =
 appTemplate :: String -> [H.Html] -> H.Html -> H.Html
 appTemplate title headers body =
     H.html $ do
+      H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! A.href "/static/css/bootstrap.css"
       H.head $ do
         H.title (H.toHtml title)
         H.meta ! A.httpEquiv "Content-Type"
@@ -257,7 +263,7 @@ buildResponse posts =
         appTemplate "Programación Funcional"
           []
           (do H.h1 "All posts"
-              H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
+              H.ul ! A.class_ "unstyled"  $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
     ))
 
 buildLink :: PostId -> H.Attribute
