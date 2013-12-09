@@ -206,7 +206,8 @@ appTemplate title headers body =
                ! A.content "text/html;charset=utf-8"
         sequence_ headers
       H.body $ do
-        body
+        H.div ! A.class_ "container" $ do
+          body
 -------------------------------------------- TEMPLATE --------------------------------------------------
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
@@ -223,7 +224,7 @@ buildShowResponse (BlogPost key post_title post_content) =
   ok (toResponse (
         appTemplate "Programación Funcional"
           []
-          (do H.h1 (H.toHtml ("Showing " ++ post_title))
+          (do H.h1 (H.toHtml ("Showing " ++ post_title)) ! A.class_ "text-center"
               H.p (H.toHtml post_content)
               buildDeleteLink key
           )
@@ -233,7 +234,7 @@ buildDeleteLink :: PostId -> H.Html
 buildDeleteLink (PostId key) = H.form
                                 ! A.method "POST"
                                 ! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
-                                   H.input ! A.type_ "submit" ! A.value "Delete"
+                                   H.input ! A.type_ "submit" ! A.value "Delete" ! A.class_ "btn btn-primary"
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
@@ -262,8 +263,8 @@ buildResponse posts =
   ok (toResponse (
         appTemplate "Programación Funcional"
           []
-          (do H.h1 "All posts"
-              H.ul ! A.class_ "unstyled"  $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
+          (do H.h1 "Posts" ! A.class_ "text-center"
+              H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
     ))
 
 buildLink :: PostId -> H.Attribute
