@@ -12,8 +12,7 @@ import Control.Exception    ( bracket )
 import Happstack.Server(Method(GET, HEAD, POST, DELETE), dir, methodM, ServerPart, Response,
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look, lookRead,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
-                        getDataFn, badRequest, lookFile, path, resp, seeOther, method,
-                        unauthorized, getHeaderM, setHeaderM)
+                        getDataFn, badRequest, lookFile, path, resp, seeOther, method)
 import           Text.Blaze
 import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
@@ -24,9 +23,6 @@ import System.Log.Logger ( updateGlobalLogger
                          , setLevel
                          , Priority(..)
                          )
-import Data.ByteString.Base64 as Base64
-import Data.Map as M
-import qualified Data.Text as B
 import Data.Data            ( Data, Typeable )
 import Data.Acid            ( AcidState, Query, Update
                             , makeAcidic, openLocalState )
@@ -36,6 +32,9 @@ import Data.SafeCopy        ( SafeCopy, base, deriveSafeCopy )
 import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
                             , Proxy(..), getOne, ixFun, ixSet )
 import qualified Data.IxSet as IxSet
+import Happstack.Server.FileServe
+
+
 
 ------------------------------------------ POST DEFINITION ---------------------------------------------
 
@@ -66,7 +65,7 @@ $(deriveSafeCopy 0 'base ''Blog)
 initialBlogState :: Blog
 initialBlogState =
     Blog { nextPostId = PostId 1
-         , posts      = IxSet.empty
+         , posts      = empty
          }
 
 addPost :: String -> String -> Update Blog BlogPost
@@ -109,59 +108,56 @@ $(makeAcidic ''Blog ['addPost, 'allPosts, 'getPost, 'updatePost, 'deletePost])
 ------------------------------------------ ACID CONFIGURATION ------------------------------------------
 ------------------------------------------ MAIN --------------------------------------------------------
 
+-- simpleHTTP :: (ToMessage a) => Conf -> ServerPartT IO a -> IO ()
+
 myPolicy :: BodyPolicy
 myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
 
--- Para entender como funciona el direccionamiento de rutas hay que entender
--- como funciona la funcion guard. methodM es un guard que chequea que el método
--- del request sea alguno de los pasados en el array. En caso de que sea así,
--- retora un valor monádico que represente "success" y entonces cuando se haga
--- bind con dicho valor se evalua si se ejecuta el comando siguiente (el handler)
 main :: IO ()
 main = 
   do updateGlobalLogger rootLoggerName (setLevel INFO)
      bracket (openLocalState initialBlogState)
              (createCheckpointAndClose)
-              (\acid -> simpleHTTP nullConf $
+              (\acid -> simpleHTTP nullConf (
                           do decodeBody myPolicy
-                             msum [ do myAuth
-                                       dir "upload" $ do method GET
-                                       newForm acid,
-                                    do dir "create_post" $ do method POST
-                                       handleNewForm acid,
-                                    do dir "update_post" $ do method POST
-                                       handleEditForm acid,
-                                    do dir "allPosts" $ do method GET
-                                       handleAllPosts acid,
-                                    do dir "posts" $ do dir "delete" $ do path $ (\s -> do method POST
-                                                                                           handleDeletePost acid s),
-                                    do dir "posts" $ do path $ (\s -> do
-                                                                        method GET
-                                                                        showPost acid s),
-                                    do dir "update_post" $ do path $ (\s -> do method POST
-                                                                               editForm acid s),
+                             msum [ 
+                                    dir "static" (serveDirectory DisableBrowsing [] "public"), 
+                                    dir "upload" (do methodM [GET, HEAD] 
+                                                     newForm acid),
+                                    dir "create_post" (do method POST
+                                                          handleNewForm acid),
+                                    dir "update_post" (do method POST
+                                                          handleEditForm acid),
+                                    dir "allPosts" (do method GET
+                                                       handleAllPosts acid),
+                                    dir "posts" ( dir "delete" ( path ( (\s -> do method POST
+                                                                                  handleDeletePost acid s)))),
+                                    dir "posts" ( do path ( (\s -> do method GET
+                                                                      showPost acid s))),
+                                    dir "update_post" ( do path ( (\s -> do method POST
+                                                                            editForm acid s))),
                                     seeOther ("/allPosts" :: String) (toResponse ())
-                                  ])
+                                  ]))
 ------------------------------------------ MAIN --------------------------------------------------------
-myAuth = basicAuth' "Test" (M.fromList [("hello", "world")]) (return "Login Failed")
+--myAuth = basicAuth' "Test" (M.fromList [("hello", "world")]) (return "Login Failed")
 
-basicAuth' realmName authMap unauthorizedPart = do
-        let validLogin name pass = M.lookup name authMap == Just pass
-        let parseHeader = Prelude.break (':'==) . Base64.decode . B.unpack . B.drop 6
-        authHeader <- getHeaderM "authorization"
-        case authHeader of
-            Nothing -> err
-            Just x  -> case parseHeader x of
-                  (name, ':':pass) | validLogin name pass -> mzero
-                                   | otherwise -> err
-                _                                       -> err
-    where
-        err = do
-            unauthorized ()
-            setHeaderM headerName headerValue
-            unauthorizedPart
-        headerValue = "Basic realm=\"" ++ realmName ++ "\""
-        headerName  = "WWW-Authenticate"
+--basicAuth' realmName authMap unauthorizedPart = do
+--        let validLogin name pass = M.lookup name authMap == Just pass
+--        let parseHeader = Prelude.break (':'==) . Base64.decode . B.unpack . B.drop 6
+--        authHeader <- getHeaderM "authorization"
+--        case authHeader of
+--            Nothing -> err
+--            Just x  -> case parseHeader x of
+--                  (name, ':':pass) | validLogin name pass -> mzero
+--                                   | otherwise -> err
+--                _                                       -> err
+--    where
+--        err = do
+--            unauthorized ()
+--            setHeaderM headerName headerValue
+--            unauthorizedPart
+--        headerValue = "Basic realm=\"" ++ realmName ++ "\""
+--        headerName  = "WWW-Authenticate"
 
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 postRq :: RqData (String, String, Integer)
@@ -172,15 +168,15 @@ postRq =
 createForm :: AcidState Blog -> BlogPost -> String -> ServerPart Response
 createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse $
     appTemplate "Programación Funcional" []
-      (H.form H.! A.enctype "multipart/form-data"
-            H.! A.method "POST"
-            H.! A.action (stringValue post_url) $ do
+      (H.form ! A.enctype "multipart/form-data" ! A.class_ "form-horizontal"
+            ! A.method "POST"
+            ! A.action (stringValue post_url) $ do
                H.label "Post Title"
-               H.input H.! A.type_ "text" H.! A.name "post_title" H.! A.value (stringValue title)
+               H.input ! A.type_ "text" ! A.name "post_title" ! A.value (stringValue title)
                H.label "Post Content"
-               H.textarea H.! A.type_ "text" H.! A.name "post_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
-               H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
-               H.input H.! A.type_ "submit" H.! A.value "upload"
+               H.textarea ! A.type_ "text" ! A.name "post_content" ! A.cols (H.toValue (60 ::Integer)) ! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
+               H.input ! A.type_ "hidden" ! A.name "post_id" ! A.value (stringValue (show key))
+               H.input ! A.type_ "submit" ! A.value "upload"
       )
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 
@@ -223,10 +219,11 @@ handleEditForm acid =
 appTemplate :: String -> [H.Html] -> H.Html -> H.Html
 appTemplate title headers body =
     H.html $ do
+      H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! A.href "/static/css/bootstrap.css"
       H.head $ do
         H.title (H.toHtml title)
-        H.meta H.! A.httpEquiv "Content-Type"
-               H.! A.content "text/html;charset=utf-8"
+        H.meta ! A.httpEquiv "Content-Type"
+               ! A.content "text/html;charset=utf-8"
         sequence_ headers
       H.body $ do
         body
@@ -248,19 +245,15 @@ buildShowResponse (BlogPost key post_title post_content) =
           []
           (do H.h1 (H.toHtml ("Showing " ++ post_title))
               H.p (H.toHtml post_content)
-              buildBackLink
               buildDeleteLink key
           )
     ))
 
-buildBackLink :: H.Html
-buildBackLink = H.a H.! A.href (stringValue "/allPosts") $ "Back"
-
 buildDeleteLink :: PostId -> H.Html
 buildDeleteLink (PostId key) = H.form
-                                H.! A.method "POST"
-                                H.! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
-                                   H.input H.! A.type_ "submit" H.! A.value "Delete"
+                                ! A.method "POST"
+                                ! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
+                                   H.input ! A.type_ "submit" ! A.value "Delete"
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
@@ -290,9 +283,7 @@ buildResponse posts =
         appTemplate "Programación Funcional"
           []
           (do H.h1 "All posts"
-              H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title))
-              H.a H.! A.href (stringValue "/upload") $ "New Post"
-          )
+              H.ul ! A.class_ "unstyled"  $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
     ))
 
 buildLink :: PostId -> H.Attribute
@@ -307,8 +298,8 @@ home acid =
       do posts <- query' acid AllPosts
          ok $ toResponse $
             appTemplate "Programación Funcional"
-              [H.meta H.! A.name "keywords"
-                      H.! A.content "happstack, blaze, html"
+              [H.meta ! A.name "keywords"
+                      ! A.content "happstack, blaze, html"
               ]
               (H.p $ H.toHtml ("A ver... " ++ show (length posts)))
 ------------------------------------------ HOME --------------------------------------------------------
