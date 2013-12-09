@@ -108,6 +108,8 @@ $(makeAcidic ''Blog ['addPost, 'allPosts, 'getPost, 'updatePost, 'deletePost])
 ------------------------------------------ ACID CONFIGURATION ------------------------------------------
 ------------------------------------------ MAIN --------------------------------------------------------
 
+-- simpleHTTP :: (ToMessage a) => Conf -> ServerPartT IO a -> IO ()
+
 myPolicy :: BodyPolicy
 myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
 
@@ -116,28 +118,46 @@ main =
   do updateGlobalLogger rootLoggerName (setLevel INFO)
      bracket (openLocalState initialBlogState)
              (createCheckpointAndClose)
-              (\acid -> simpleHTTP nullConf $
+              (\acid -> simpleHTTP nullConf (
                           do decodeBody myPolicy
                              msum [ 
-                                    do dir "static" $ do serveDirectory DisableBrowsing [] "public",
-                                    do dir "upload" $ do methodM [GET, HEAD] 
-                                       newForm acid,
-                                    do dir "create_post" $ do methodM [POST]
-                                       handleNewForm acid,
-                                    do dir "update_post" $ do methodM [POST]
-                                       handleEditForm acid,
-                                    do dir "allPosts" $ do methodM [GET]
-                                       handleAllPosts acid,
-                                    do dir "posts" $ do dir "delete" $ do path $ (\s -> do methodM [POST] 
-                                                                                           handleDeletePost acid s),
-                                    do dir "posts" $ do path $ (\s -> do
-                                                                        methodM [GET]
-                                                                        showPost acid s),
-                                    do dir "update_post" $ do path $ (\s -> do methodM [POST]
-                                                                               editForm acid s),
+                                    dir "static" (serveDirectory DisableBrowsing [] "public"), 
+                                    dir "upload" (do methodM [GET, HEAD] 
+                                                     newForm acid),
+                                    dir "create_post" (do method POST
+                                                          handleNewForm acid),
+                                    dir "update_post" (do method POST
+                                                          handleEditForm acid),
+                                    dir "allPosts" (do method GET
+                                                       handleAllPosts acid),
+                                    dir "posts" ( dir "delete" ( path ( (\s -> do method POST
+                                                                                  handleDeletePost acid s)))),
+                                    dir "posts" ( do path ( (\s -> do method GET
+                                                                      showPost acid s))),
+                                    dir "update_post" ( do path ( (\s -> do method POST
+                                                                            editForm acid s))),
                                     seeOther ("/allPosts" :: String) (toResponse ())
-                                  ])
+                                  ]))
 ------------------------------------------ MAIN --------------------------------------------------------
+--myAuth = basicAuth' "Test" (M.fromList [("hello", "world")]) (return "Login Failed")
+
+--basicAuth' realmName authMap unauthorizedPart = do
+--        let validLogin name pass = M.lookup name authMap == Just pass
+--        let parseHeader = Prelude.break (':'==) . Base64.decode . B.unpack . B.drop 6
+--        authHeader <- getHeaderM "authorization"
+--        case authHeader of
+--            Nothing -> err
+--            Just x  -> case parseHeader x of
+--                  (name, ':':pass) | validLogin name pass -> mzero
+--                                   | otherwise -> err
+--                _                                       -> err
+--    where
+--        err = do
+--            unauthorized ()
+--            setHeaderM headerName headerValue
+--            unauthorizedPart
+--        headerValue = "Basic realm=\"" ++ realmName ++ "\""
+--        headerName  = "WWW-Authenticate"
 
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 postRq :: RqData (String, String, Integer)
