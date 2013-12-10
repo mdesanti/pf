@@ -167,17 +167,24 @@ postRq =
 
 createForm :: AcidState Blog -> BlogPost -> String -> ServerPart Response
 createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse $
-    appTemplate "Programación Funcional" []
-      (H.form ! A.enctype "multipart/form-data" ! A.class_ "form-horizontal"
-            ! A.method "POST"
-            ! A.action (stringValue post_url) $ do
-               H.label "Post Title"
-               H.input ! A.type_ "text" ! A.name "post_title" ! A.value (stringValue title)
-               H.label "Post Content"
-               H.textarea ! A.type_ "text" ! A.name "post_content" ! A.cols (H.toValue (60 ::Integer)) ! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
-               H.input ! A.type_ "hidden" ! A.name "post_id" ! A.value (stringValue (show key))
-               H.input ! A.type_ "submit" ! A.value "upload"
-      )
+    appTemplate "Programación Funcional" [] $ do
+      H.div (H.h1 "New Post") ! A.class_ "page-header"
+      H.form ! A.enctype "multipart/form-data" ! A.class_ "form-horizontal" 
+        ! A.method "POST"
+        ! A.action (stringValue post_url) $ do
+          H.div ! A.class_ "control-group" $ do
+            H.label "Post Title" ! A.class_ "control-label"
+            H.div ! A.class_ "controls" $ do  
+              H.input ! A.type_ "text" ! A.name "post_title" ! A.value (stringValue title)
+          H.div ! A.class_ "control-group" $ do
+            H.label "Post Content" ! A.class_ "control-label"
+            H.div ! A.class_ "controls" $ do  
+              H.textarea ! A.type_ "text" ! A.name "post_content" ! A.cols (H.toValue (60 ::Integer)) ! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
+          H.div ! A.class_ "control-group" $ do
+            H.div ! A.class_ "controls" $ do  
+              H.input ! A.type_ "hidden" ! A.name "post_id" ! A.value (stringValue (show key))
+              H.input ! A.type_ "submit" ! A.value "Upload" ! A.class_ "btn btn-primary"
+      
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 
 ------------------------------------------ POST UPLOAD -------------------------------------------------
@@ -219,7 +226,7 @@ handleEditForm acid =
 appTemplate :: String -> [H.Html] -> H.Html -> H.Html
 appTemplate title headers body =
     H.html $ do
-      H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! A.href "/static/css/bootstrap.css"
+      H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! A.href "/static/css/bootstrap.min.css"
       H.head $ do
         H.title (H.toHtml title)
         H.meta ! A.httpEquiv "Content-Type"
@@ -244,8 +251,9 @@ buildShowResponse (BlogPost key post_title post_content) =
   ok (toResponse (
         appTemplate "Programación Funcional"
           []
-          (do H.h1 (H.toHtml ("Showing " ++ post_title)) ! A.class_ "text-center"
-              H.p (H.toHtml post_content)
+          (do H.div ( H.h1 (H.toHtml ("Showing " ++ post_title))) ! A.class_ "page-header"
+              H.div ! A.class_ "hero-unit" $ do
+                H.p (H.toHtml post_content)
               buildDeleteLink key
           )
     ))
@@ -281,10 +289,9 @@ handleAllPosts acid =
 buildResponse :: [BlogPost] -> ServerPart Response
 buildResponse posts = 
   ok (toResponse (
-        appTemplate "Programación Funcional"
-          []
-          (do H.h1 "Posts" ! A.class_ "text-center"
-              H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
+        appTemplate "Programación Funcional" [] $ do
+          H.div (H.h1 "Posts") ! A.class_ "page-header"
+          H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title))
     ))
 
 buildLink :: PostId -> H.Attribute
