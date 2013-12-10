@@ -13,7 +13,8 @@ import Happstack.Server(Method(GET, HEAD, POST, DELETE), dir, methodM, ServerPar
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look, lookRead,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
                         getDataFn, badRequest, lookFile, path, resp, seeOther, method,
-                        getHeaderM, unauthorized, setHeaderM)
+                        getHeaderM, unauthorized, setHeaderM, askRq, getHeader, lookCookieValue,
+                        CookieLife(Session), addCookie, mkCookie, HasRqData)
 import           Text.Blaze
 import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
@@ -24,8 +25,11 @@ import System.Log.Logger ( updateGlobalLogger
                          , setLevel
                          , Priority(..)
                          )
+import Happstack.Server.Internal.Types
+import Data.ByteString
 import Data.ByteString.Base64 as Base64
 import qualified Data.Text as B
+import Data.ByteString.Char8 as C
 import Data.Text.Encoding
 import Data.Map as M
 import Data.Data            ( Data, Typeable )
@@ -128,46 +132,46 @@ main =
                           do decodeBody myPolicy
                              msum [ 
                                     dir "static" (serveDirectory DisableBrowsing [] "public"), 
+                                    dir "login" (do
+                                                  method GET
+                                                  createLoginForm),
+                                    dir "login" (do
+                                                    method POST
+                                                    handleLogin),
                                     dir "upload" (do
+                                                    myAuth
                                                     methodM [GET, HEAD] 
                                                     newForm acid),
-                                    dir "create_post" (do method POST
+                                    dir "create_post" (do 
+                                                          myAuth
+                                                          method POST
                                                           handleNewForm acid),
-                                    dir "update_post" (do method POST
+                                    dir "update_post" (do 
+                                                          myAuth
+                                                          method POST
                                                           handleEditForm acid),
                                     dir "allPosts" (do method GET
                                                        handleAllPosts acid),
-                                    dir "posts" ( dir "delete" ( path ( (\s -> do method POST
+                                    dir "posts" ( dir "delete" ( path ( (\s -> do 
+                                                                                  myAuth
+                                                                                  method POST
                                                                                   handleDeletePost acid s)))),
                                     dir "posts" ( do path ( (\s -> do method GET
                                                                       showPost acid s))),
-                                    dir "update_post" ( do path ( (\s -> do method POST
+                                    dir "update_post" ( do path ( (\s -> do 
+                                                                            myAuth
+                                                                            method POST
                                                                             editForm acid s))),
                                     seeOther ("/allPosts" :: String) (toResponse ())
                                   ]))
 ------------------------------------------ MAIN --------------------------------------------------------
---myAuth = basicAuth' "Test" (M.fromList [("hello", "world")])
-
---basicAuth' realmName authMap =
---    do
---        let validLogin name pass = M.lookup name authMap == Just pass
---        authHeader <- getHeaderM "authorization"
---        case authHeader of
---            Nothing -> err
---            Just x  -> case parseHeader x of
---                (name, ':':pass) | validLogin name pass -> do
---                                                            mzero
---                                 | otherwise -> err
---                _                                       -> err
---    where
---        err = do
---            unauthorized ()
---            setHeaderM headerName headerValue
---            (return "Login Failed")
---        headerValue = "Basic realm=\"" ++ realmName ++ "\""
---        headerName  = "WWW-Authenticate"
-
---parseHeader x = break (':'==) (B.unpack (B.drop 6 (decodeUtf8 x)))
+--setUserCookie =  do
+--           addCookie Session (mkCookie "User" "pepe")
+--           return ()
+myAuth = do
+          userCookie <- (lookCookieValue "User")
+          liftIO $ print (show userCookie)
+          return ()
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 postRq :: RqData (String, String, Integer)
 postRq =
@@ -176,18 +180,58 @@ postRq =
 
 createForm :: AcidState Blog -> BlogPost -> String -> ServerPart Response
 createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse $
-    appTemplate "Programación Funcional" []
-      (H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal"
-            H.! A.method "POST"
-            H.! A.action (stringValue post_url) $ do
-               H.label "Post Title"
-               H.input H.! A.type_ "text" H.! A.name "post_title" H.! A.value (stringValue title)
-               H.label "Post Content"
-               H.textarea H.! A.type_ "text" H.! A.name "post_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
-               H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
-               H.input H.! A.type_ "submit" H.! A.value "upload"
-      )
+    appTemplate "Programación Funcional" [] $ do
+      H.div (H.h1 "New Post") H.! A.class_ "page-header"
+      H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
+        H.! A.method "POST"
+        H.! A.action (stringValue post_url) $ do
+          H.div H.! A.class_ "control-group" $ do
+            H.label "Post Title" H.! A.class_ "control-label"
+            H.div H.! A.class_ "controls" $ do  
+              H.input H.! A.type_ "text" H.! A.name "post_title" H.! A.value (stringValue title)
+          H.div H.! A.class_ "control-group" $ do
+            H.label "Post Content" H.! A.class_ "control-label"
+            H.div H.! A.class_ "controls" $ do  
+              H.textarea H.! A.type_ "text" H.! A.name "post_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
+          H.div H.! A.class_ "control-group" $ do
+            H.div H.! A.class_ "controls" $ do  
+              H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
+              H.input H.! A.type_ "submit" H.! A.value "Upload" H.! A.class_ "btn btn-primary"
 ------------------------------------------ COMMON POST FORM --------------------------------------------
+
+------------------------------------------ LOGIN FORM --------------------------------------------------
+userInfo :: RqData (String, String)
+userInfo =
+    (,) <$> look "username" <*> look "password"
+
+createLoginForm :: ServerPart Response
+createLoginForm = ok (toResponse (appTemplate "Programación Funcional" [] $ do
+      H.div (H.h1 "Login") H.! A.class_ "page-header"
+      H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
+        H.! A.method "POST"
+        H.! A.action (stringValue "/login") $ do
+          H.div H.! A.class_ "control-group" $ do
+            H.label "Username" H.! A.class_ "control-label"
+            H.div H.! A.class_ "controls" $ do  
+              H.input H.! A.type_ "text" H.! A.name "username"
+          H.div H.! A.class_ "control-group" $ do
+            H.label "Password" H.! A.class_ "control-label"
+            H.div H.! A.class_ "controls" $ do  
+              H.input H.! A.type_ "password" H.! A.name "password"
+          H.div H.! A.class_ "control-group" $ do
+            H.div H.! A.class_ "controls" $ do  
+              H.input H.! A.type_ "submit" H.! A.value "Upload" H.! A.class_ "btn btn-primary"))
+
+handleLogin :: ServerPart Response
+handleLogin = do
+                info <- getDataFn userInfo
+                case info of
+                  Left e -> badRequest (toResponse (Prelude.unlines e))
+                  Right (username, password) -> do
+                                                  addCookie Session (mkCookie "User" "pepe")
+                                                  seeOther (show "/allPosts") (toResponse ())
+------------------------------------------ LOGIN FORM --------------------------------------------------
+
 
 ------------------------------------------ POST UPLOAD -------------------------------------------------
 
@@ -198,7 +242,7 @@ handleNewForm :: AcidState Blog -> ServerPart Response
 handleNewForm acid =
    do post_data <- getDataFn postRq
       case post_data of
-        Left e -> badRequest (toResponse (unlines e))
+        Left e -> badRequest (toResponse (Prelude.unlines e))
         Right(post_title, post_content, post_id) -> 
                     do (BlogPost (PostId post_id) title content) <- update' acid (AddPost post_title post_content)
                        seeOther ("/posts/" ++ show post_id) (toResponse ())
@@ -218,7 +262,7 @@ handleEditForm :: AcidState Blog -> ServerPart Response
 handleEditForm acid =
    do post_data <- getDataFn postRq
       case post_data of
-        Left e -> badRequest (toResponse (unlines e))
+        Left e -> badRequest (toResponse (Prelude.unlines e))
         Right(post_title, post_content, post_id) -> 
                     do post <- update' acid (UpdatePost (BlogPost (PostId post_id) post_title post_content))
                        seeOther ("/posts/" ++ show post_id) (toResponse ())
@@ -235,7 +279,8 @@ appTemplate title headers body =
                H.! A.content "text/html;charset=utf-8"
         sequence_ headers
       H.body $ do
-        body
+        H.div H.! A.class_ "container" $ do
+          body
 -------------------------------------------- TEMPLATE --------------------------------------------------
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
@@ -252,8 +297,9 @@ buildShowResponse (BlogPost key post_title post_content) =
   ok (toResponse (
         appTemplate "Programación Funcional"
           []
-          (do H.h1 (H.toHtml ("Showing " ++ post_title))
-              H.p (H.toHtml post_content)
+          (do H.div ( H.h1 (H.toHtml ("Showing " ++ post_title))) H.! A.class_ "page-header"
+              H.div H.! A.class_ "hero-unit" $ do
+                H.p (H.toHtml post_content)
               buildDeleteLink key
           )
     ))
@@ -262,7 +308,7 @@ buildDeleteLink :: PostId -> H.Html
 buildDeleteLink (PostId key) = H.form
                                 H.! A.method "POST"
                                 H.! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
-                                   H.input H.! A.type_ "submit" H.! A.value "Delete"
+                                   H.input H.! A.type_ "submit" H.! A.value "Delete" H.! A.class_ "btn btn-primary"
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
@@ -289,10 +335,9 @@ handleAllPosts acid =
 buildResponse :: [BlogPost] -> ServerPart Response
 buildResponse posts = 
   ok (toResponse (
-        appTemplate "Programación Funcional"
-          []
-          (do H.h1 "All posts"
-              H.ul H.! A.class_ "unstyled"  $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title)))
+        appTemplate "Programación Funcional" [] $ do
+          H.div (H.h1 "Posts") H.! A.class_ "page-header"
+          H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title))
     ))
 
 buildLink :: PostId -> H.Attribute
@@ -310,7 +355,7 @@ home acid =
               [H.meta H.! A.name "keywords"
                       H.! A.content "happstack, blaze, html"
               ]
-              (H.p $ H.toHtml ("A ver... " ++ show (length posts)))
+              (H.p $ H.toHtml ("A ver... " ++ show (Prelude.length posts)))
 ------------------------------------------ HOME --------------------------------------------------------
 
 

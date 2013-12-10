@@ -8,5 +8,5 @@ cabal-dev
 form_example.hs
 textarea.html
 acid.hs
-state/*
+state/Blog/*
 server
