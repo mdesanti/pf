@@ -301,6 +301,7 @@ buildShowResponse (BlogPost key post_title post_content) =
               H.div H.! A.class_ "hero-unit" $ do
                 H.p (H.toHtml post_content)
               buildDeleteLink key
+              H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
           )
     ))
 
@@ -338,6 +339,7 @@ buildResponse posts =
         appTemplate "Programación Funcional" [] $ do
           H.div (H.h1 "Posts") H.! A.class_ "page-header"
           H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title))
+          H.a "Upload" H.! A.href "/upload" H.! A.class_ "btn btn-primary"
     ))
 
 buildLink :: PostId -> H.Attribute
