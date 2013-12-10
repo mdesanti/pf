@@ -12,7 +12,8 @@ import Control.Exception    ( bracket )
 import Happstack.Server(Method(GET, HEAD, POST, DELETE), dir, methodM, ServerPart, Response,
                         toResponse, simpleHTTP, nullConf, ok, toMessage, look, lookRead,
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
-                        getDataFn, badRequest, lookFile, path, resp, seeOther, method)
+                        getDataFn, badRequest, lookFile, path, resp, seeOther, method,
+                        getHeaderM, unauthorized, setHeaderM)
 import           Text.Blaze
 import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
@@ -23,6 +24,10 @@ import System.Log.Logger ( updateGlobalLogger
                          , setLevel
                          , Priority(..)
                          )
+import Data.ByteString.Base64 as Base64
+import qualified Data.Text as B
+import Data.Text.Encoding
+import Data.Map as M
 import Data.Data            ( Data, Typeable )
 import Data.Acid            ( AcidState, Query, Update
                             , makeAcidic, openLocalState )
@@ -33,6 +38,7 @@ import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
                             , Proxy(..), getOne, ixFun, ixSet )
 import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
+import System.Log.Logger
 
 
 
@@ -65,7 +71,7 @@ $(deriveSafeCopy 0 'base ''Blog)
 initialBlogState :: Blog
 initialBlogState =
     Blog { nextPostId = PostId 1
-         , posts      = empty
+         , posts      = IxSet.empty
          }
 
 addPost :: String -> String -> Update Blog BlogPost
@@ -122,8 +128,9 @@ main =
                           do decodeBody myPolicy
                              msum [ 
                                     dir "static" (serveDirectory DisableBrowsing [] "public"), 
-                                    dir "upload" (do methodM [GET, HEAD] 
-                                                     newForm acid),
+                                    dir "upload" (do
+                                                    methodM [GET, HEAD] 
+                                                    newForm acid),
                                     dir "create_post" (do method POST
                                                           handleNewForm acid),
                                     dir "update_post" (do method POST
@@ -139,26 +146,28 @@ main =
                                     seeOther ("/allPosts" :: String) (toResponse ())
                                   ]))
 ------------------------------------------ MAIN --------------------------------------------------------
---myAuth = basicAuth' "Test" (M.fromList [("hello", "world")]) (return "Login Failed")
+--myAuth = basicAuth' "Test" (M.fromList [("hello", "world")])
 
---basicAuth' realmName authMap unauthorizedPart = do
+--basicAuth' realmName authMap =
+--    do
 --        let validLogin name pass = M.lookup name authMap == Just pass
---        let parseHeader = Prelude.break (':'==) . Base64.decode . B.unpack . B.drop 6
 --        authHeader <- getHeaderM "authorization"
 --        case authHeader of
 --            Nothing -> err
 --            Just x  -> case parseHeader x of
---                  (name, ':':pass) | validLogin name pass -> mzero
---                                   | otherwise -> err
+--                (name, ':':pass) | validLogin name pass -> do
+--                                                            mzero
+--                                 | otherwise -> err
 --                _                                       -> err
 --    where
 --        err = do
 --            unauthorized ()
 --            setHeaderM headerName headerValue
---            unauthorizedPart
+--            (return "Login Failed")
 --        headerValue = "Basic realm=\"" ++ realmName ++ "\""
 --        headerName  = "WWW-Authenticate"
 
+--parseHeader x = break (':'==) (B.unpack (B.drop 6 (decodeUtf8 x)))
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 postRq :: RqData (String, String, Integer)
 postRq =
@@ -168,15 +177,15 @@ postRq =
 createForm :: AcidState Blog -> BlogPost -> String -> ServerPart Response
 createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse $
     appTemplate "Programación Funcional" []
-      (H.form ! A.enctype "multipart/form-data" ! A.class_ "form-horizontal"
-            ! A.method "POST"
-            ! A.action (stringValue post_url) $ do
+      (H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal"
+            H.! A.method "POST"
+            H.! A.action (stringValue post_url) $ do
                H.label "Post Title"
-               H.input ! A.type_ "text" ! A.name "post_title" ! A.value (stringValue title)
+               H.input H.! A.type_ "text" H.! A.name "post_title" H.! A.value (stringValue title)
                H.label "Post Content"
-               H.textarea ! A.type_ "text" ! A.name "post_content" ! A.cols (H.toValue (60 ::Integer)) ! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
-               H.input ! A.type_ "hidden" ! A.name "post_id" ! A.value (stringValue (show key))
-               H.input ! A.type_ "submit" ! A.value "upload"
+               H.textarea H.! A.type_ "text" H.! A.name "post_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
+               H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
+               H.input H.! A.type_ "submit" H.! A.value "upload"
       )
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 
@@ -219,11 +228,11 @@ handleEditForm acid =
 appTemplate :: String -> [H.Html] -> H.Html -> H.Html
 appTemplate title headers body =
     H.html $ do
-      H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! A.href "/static/css/bootstrap.css"
+      H.link H.! A.rel "stylesheet" H.! A.type_ "text/css" H.! A.href "/static/css/bootstrap.css"
       H.head $ do
         H.title (H.toHtml title)
-        H.meta ! A.httpEquiv "Content-Type"
-               ! A.content "text/html;charset=utf-8"
+        H.meta H.! A.httpEquiv "Content-Type"
+               H.! A.content "text/html;charset=utf-8"
         sequence_ headers
       H.body $ do
         body
@@ -251,9 +260,9 @@ buildShowResponse (BlogPost key post_title post_content) =
 
 buildDeleteLink :: PostId -> H.Html
 buildDeleteLink (PostId key) = H.form
-                                ! A.method "POST"
-                                ! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
-                                   H.input ! A.type_ "submit" ! A.value "Delete"
+                                H.! A.method "POST"
+                                H.! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
+                                   H.input H.! A.type_ "submit" H.! A.value "Delete"
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
@@ -283,7 +292,7 @@ buildResponse posts =
         appTemplate "Programación Funcional"
           []
           (do H.h1 "All posts"
-              H.ul ! A.class_ "unstyled"  $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title)))
+              H.ul H.! A.class_ "unstyled"  $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title)))
     ))
 
 buildLink :: PostId -> H.Attribute
@@ -298,8 +307,8 @@ home acid =
       do posts <- query' acid AllPosts
          ok $ toResponse $
             appTemplate "Programación Funcional"
-              [H.meta ! A.name "keywords"
-                      ! A.content "happstack, blaze, html"
+              [H.meta H.! A.name "keywords"
+                      H.! A.content "happstack, blaze, html"
               ]
               (H.p $ H.toHtml ("A ver... " ++ show (length posts)))
 ------------------------------------------ HOME --------------------------------------------------------
