@@ -184,6 +184,7 @@ createForm acid (BlogPost (PostId key) title content) post_url = ok $ toResponse
             H.div ! A.class_ "controls" $ do  
               H.input ! A.type_ "hidden" ! A.name "post_id" ! A.value (stringValue (show key))
               H.input ! A.type_ "submit" ! A.value "Upload" ! A.class_ "btn btn-primary"
+            H.a "Back" ! A.href "/allPosts" ! A.class_ "btn"
       
 ------------------------------------------ COMMON POST FORM --------------------------------------------
 
@@ -255,6 +256,7 @@ buildShowResponse (BlogPost key post_title post_content) =
               H.div ! A.class_ "hero-unit" $ do
                 H.p (H.toHtml post_content)
               buildDeleteLink key
+              H.a "Back" ! A.href "/allPosts" ! A.class_ "btn"
           )
     ))
 
@@ -292,6 +294,7 @@ buildResponse posts =
         appTemplate "Programación Funcional" [] $ do
           H.div (H.h1 "Posts") ! A.class_ "page-header"
           H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a ! (buildLink key) $ H.toHtml title))
+          H.a "Upload" ! A.href "/upload" ! A.class_ "btn btn-primary"
     ))
 
 buildLink :: PostId -> H.Attribute
