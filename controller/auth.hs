@@ -60,3 +60,14 @@ module Controller.Auth where
                                       addCookie Session (mkCookie "User" "valid")
                                       return (redirect 302 ("allPosts" :: String) (toResponse ()))
            (Right a) | otherwise -> errorHandler "Invalid username or password"
+
+
+  data AuthCredentials = AuthCredentials { username :: String,  password :: String }
+  isValid :: AuthCredentials -> Bool
+  isValid (AuthCredentials username password) = username == "admin" && password == "admin"
+
+  authInfo :: RqData AuthCredentials
+  authInfo = do
+       username <- look "username"
+       password <- look "password"
+       return (AuthCredentials username password)

@@ -46,15 +46,6 @@ module View.Login where
   import View.Posts
   import View.Template
 
-  data AuthCredentials = AuthCredentials { username :: String,  password :: String }
-  isValid :: AuthCredentials -> Bool
-  isValid (AuthCredentials username password) = username == "admin" && password == "admin"
-
-  authInfo :: RqData AuthCredentials
-  authInfo = do
-       username <- look "username"
-       password <- look "password"
-       return (AuthCredentials username password)
 
   createLoginForm :: String -> ServerPart Response
   createLoginForm error_message = ok (toResponse (appTemplate "Programación Funcional" [] $ do
