@@ -2,7 +2,7 @@
   GeneralizedNewtypeDeriving, MultiParamTypeClasses,
   TemplateHaskell, TypeFamilies, RecordWildCards #-}
 
-module View.Template where
+module CommentsAcid where
 
 import Control.Applicative  ((<$>), (<*>))
 import Control.Monad
@@ -42,26 +42,35 @@ import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
                             , Proxy(..), getOne, ixFun, ixSet )
 import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
-import System.Log.Logger
+import Model.Comment
+import Model.Blog
 
-appTemplate :: String -> [H.Html] -> H.Html -> H.Html
-appTemplate title headers body =
-    H.html $ do
-      H.link H.! A.rel "stylesheet" H.! A.type_ "text/css" H.! A.href "/static/css/bootstrap.css"
-      H.head $ do
-        H.title (H.toHtml title)
-        H.meta H.! A.httpEquiv "Content-Type"
-               H.! A.content "text/html;charset=utf-8"
-        sequence_ headers
-      H.body $ do
-        H.div H.! A.class_ "container" $ do
-          body
+$(deriveSafeCopy 0 'base ''CommentId)
+$(deriveSafeCopy 0 'base ''Comment)
+$(deriveSafeCopy 0 'base ''Comments)
+
+addComment :: String -> PostId -> Update Comments Comment
+addComment comment_content post_postId =
+    do b@Comments{..} <- get
+       let comment = Comment { commentId = nextCommentId
+                             , content  = comment_content
+                             , postId = post_postId
+                           }
+       put $ b { nextCommentId = succ nextCommentId
+               , comments      = IxSet.insert comment comments
+               }
+       return comment
+
+getCommentsForPost :: PostId -> Query Comments [Comment]
+getCommentsForPost postId = 
+    do Comments{..} <- ask
+       let all_comments = IxSet.toList comments
+       return (Prelude.filter (\c -> (getPostId c) == postId) all_comments)
+
+
+$(makeAcidic ''Comments ['addComment, 'getCommentsForPost])
 
 
 
 
 
-
-
-
-          

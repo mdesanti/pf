@@ -45,8 +45,10 @@ import Happstack.Server.FileServe
 import System.Log.Logger
 import View.Template
 import Model.Blog
+import Model.Comment
 import Controller.Auth
 import Controller.Post
+import Acid
 
 ------------------------------------------ MAIN --------------------------------------------------------
 
@@ -58,44 +60,46 @@ myPolicy = (defaultBodyPolicy "/tmp/" (10*10^6) 1000 1000)
 main :: IO ()
 main = 
   do updateGlobalLogger rootLoggerName (setLevel INFO)
-     bracket (openLocalState initialBlogState)
+     bracket (openLocalState initialCommentsState)
              (createCheckpointAndClose)
-              (\acid -> simpleHTTP nullConf (
-                          do decodeBody myPolicy
-                             msum [ 
-                                    dir "static" (serveDirectory DisableBrowsing [] "public"), 
-                                    dir "login" (do
-                                                  method GET
-                                                  login),
-                                    dir "login" (do
-                                                    method POST
-                                                    handleLogin),
-                                    dir "upload" (do
-                                                    myAuth
-                                                    methodM [GET, HEAD] 
-                                                    newForm acid),
-                                    dir "create_post" (do 
-                                                          myAuth
-                                                          method POST
-                                                          handleNewForm acid),
-                                    dir "update_post" (do 
-                                                          myAuth
-                                                          method POST
-                                                          handleEditForm acid),
-                                    dir "allPosts" (do method GET
-                                                       handleAllPosts acid),
-                                    dir "posts" ( dir "delete" ( path ( (\s -> do 
-                                                                                  myAuth
-                                                                                  method POST
-                                                                                  handleDeletePost acid s)))),
-                                    dir "posts" ( do path ( (\s -> do method GET
-                                                                      showPost acid s))),
-                                    dir "update_post" ( do path ( (\s -> do 
-                                                                            myAuth
-                                                                            method POST
-                                                                            editForm acid s))),
-                                    seeOther ("/allPosts" :: String) (toResponse ())
-                                  ]))
+             (\commentAcid -> bracket (openLocalState initialBlogState)
+                                      (createCheckpointAndClose)
+                                      (\acid -> simpleHTTP nullConf (
+                                          do decodeBody myPolicy
+                                             msum [ 
+                                                    dir "static" (serveDirectory DisableBrowsing [] "public"), 
+                                                    dir "login" (do
+                                                                  method GET
+                                                                  login),
+                                                    dir "login" (do
+                                                                    method POST
+                                                                    handleLogin),
+                                                    dir "upload" (do
+                                                                    myAuth
+                                                                    methodM [GET, HEAD] 
+                                                                    newForm acid),
+                                                    dir "create_post" (do 
+                                                                          myAuth
+                                                                          method POST
+                                                                          handleNewForm acid),
+                                                    dir "update_post" (do 
+                                                                          myAuth
+                                                                          method POST
+                                                                          handleEditForm acid),
+                                                    dir "allPosts" (do method GET
+                                                                       handleAllPosts acid),
+                                                    dir "posts" ( dir "delete" ( path ( (\s -> do 
+                                                                                                  myAuth
+                                                                                                  method POST
+                                                                                                  handleDeletePost acid s)))),
+                                                    dir "posts" ( do path ( (\s -> do method GET
+                                                                                      showPost acid s))),
+                                                    dir "update_post" ( do path ( (\s -> do 
+                                                                                            myAuth
+                                                                                            method POST
+                                                                                            editForm acid s))),
+                                                    seeOther ("/allPosts" :: String) (toResponse ())
+                                                  ])))
 ------------------------------------------ MAIN --------------------------------------------------------
 
 myAuth = do
@@ -110,5 +114,9 @@ initialBlogState =
          , posts      = IxSet.empty
          }
 
-
+initialCommentsState :: Comments
+initialCommentsState =
+    Comments { nextCommentId = CommentId 1
+              , comments      = IxSet.empty
+             }
 

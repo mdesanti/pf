@@ -2,7 +2,7 @@
   GeneralizedNewtypeDeriving, MultiParamTypeClasses,
   TemplateHaskell, TypeFamilies, RecordWildCards #-}
 
-module View.Template where
+module Model.Comment where
 
 import Control.Applicative  ((<$>), (<*>))
 import Control.Monad
@@ -43,25 +43,38 @@ import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
 import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
 import System.Log.Logger
-
-appTemplate :: String -> [H.Html] -> H.Html -> H.Html
-appTemplate title headers body =
-    H.html $ do
-      H.link H.! A.rel "stylesheet" H.! A.type_ "text/css" H.! A.href "/static/css/bootstrap.css"
-      H.head $ do
-        H.title (H.toHtml title)
-        H.meta H.! A.httpEquiv "Content-Type"
-               H.! A.content "text/html;charset=utf-8"
-        sequence_ headers
-      H.body $ do
-        H.div H.! A.class_ "container" $ do
-          body
+import Model.Blog
 
 
+newtype CommentId = CommentId { unCommentId :: Integer } deriving (Eq, Ord, Show, Read, Data, Enum, Typeable)
+
+data Comment = Comment { commentId :: CommentId, content :: String, postId :: PostId } deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+isValidComment :: Comment -> Bool
+isValidComment (Comment _ [] _) = False
+isValidComment (Comment _ comment _) = True
+
+instance Indexable Comment where
+  empty = ixSet
+    [ ixFun $ \bp -> [ commentId bp ]]
+
+data Comments = Comments
+    { nextCommentId :: CommentId
+    , comments      :: IxSet Comment
+    }
+    deriving (Data, Typeable)
+
+getContent :: Comment -> String
+getContent (Comment _ content _) = content
+
+getPostId :: Comment -> PostId
+getPostId (Comment commentId content postId) = postId
 
 
 
 
 
 
-          
+
+
+

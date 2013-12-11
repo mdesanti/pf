@@ -49,14 +49,14 @@ import Acid
 
 
 newForm :: AcidState Blog -> ServerPart Response
-newForm acid = createForm acid (BlogPost (PostId 0) "" "") "/create_post" ""
+newForm acid = createForm (BlogPost (PostId 0) "" "") "/create_post" ""
 
 
 editForm :: AcidState Blog -> Integer -> ServerPart Response
 editForm acid key = 
                     do post <- query' acid (GetPost (PostId key))
                        case post of
-                        Just (BlogPost a b c) -> createForm acid (BlogPost a b c) "/update_post" ""
+                        Just (BlogPost a b c) -> createForm (BlogPost a b c) "/update_post" ""
                         Nothing -> badRequest (toResponse (("Could not find post with id " ++ show key) :: String))
 
 
@@ -69,7 +69,7 @@ handleNewForm acid =
                   | isValidBlog (BlogPost post_id post_title post_content) ->
                     do (BlogPost (PostId post_id) title content) <- update' acid (AddPost post_title post_content)
                        return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
-                  | otherwise -> createForm acid (BlogPost (PostId 0) "" "") "/create_post" "Title or Content can not be empty"
+                  | otherwise -> createForm (BlogPost (PostId 0) "" "") "/create_post" "Title or Content can not be empty"
 
 
 handleEditForm :: AcidState Blog -> ServerPart Response
@@ -81,7 +81,7 @@ handleEditForm acid =
                   | isValidBlog (BlogPost (PostId post_id) post_title post_content) -> 
                     do post <- update' acid (UpdatePost (BlogPost (PostId post_id) post_title post_content))
                        return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
-                  | otherwise -> createForm acid (BlogPost (PostId 0) "" "") "/create_post" "Title or Content can not be empty"
+                  | otherwise -> createForm (BlogPost (PostId 0) "" "") "/create_post" "Title or Content can not be empty"
 
 
 showPost :: AcidState Blog -> Integer -> ServerPart Response

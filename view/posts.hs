@@ -46,8 +46,8 @@ module View.Posts where
   import Model.Blog
   import View.Template
 
-  createForm :: AcidState Blog -> BlogPost -> String -> String -> ServerPart Response
-  createForm acid (BlogPost (PostId key) title content) post_url error_message = ok $ toResponse $
+  createForm :: BlogPost -> String -> String -> ServerPart Response
+  createForm (BlogPost (PostId key) title content) post_url error_message = ok $ toResponse $
       appTemplate "Programación Funcional" [] $ do
         H.div (H.h1 "New Post") H.! A.class_ "page-header"
         H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 

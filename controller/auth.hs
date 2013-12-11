@@ -63,6 +63,7 @@ module Controller.Auth where
 
 
   data AuthCredentials = AuthCredentials { username :: String,  password :: String }
+
   isValid :: AuthCredentials -> Bool
   isValid (AuthCredentials username password) = username == "admin" && password == "admin"
 
@@ -71,3 +72,12 @@ module Controller.Auth where
        username <- look "username"
        password <- look "password"
        return (AuthCredentials username password)
+
+  isLoggedIn :: ServerPart Bool
+  isLoggedIn = do
+                d <- getDataFn authInfo
+                case d of
+                  Left e  -> mzero 
+                  Right a -> return (isValid a)
+
+

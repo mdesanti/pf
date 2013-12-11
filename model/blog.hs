@@ -67,3 +67,12 @@ data Blog = Blog
 getName (BlogPost _ title content) = title
 getContent (BlogPost _ title content) = content
 getId (BlogPost key _ _) = key
+
+
+
+
+
+
+
+
+
