@@ -50,7 +50,6 @@ module View.Comments where
 ------------------------------------------ CREATE ONE COMMENT --------------------------------------------
   createCommentForm :: Comment -> String -> String -> H.Html
   createCommentForm (Comment (CommentId key) comment_content (PostId post_key)) post_url error_message =
-    H.div (H.h1 "New Comment") H.! A.class_ "page-header"
     H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
       H.! A.method "POST"
       H.! A.action (stringValue post_url) $ do

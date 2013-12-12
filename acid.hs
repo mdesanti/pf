@@ -94,10 +94,10 @@ $(deriveSafeCopy 0 'base ''Comment)
 $(deriveSafeCopy 0 'base ''Comments)
 
 addComment :: String -> PostId -> Update Comments Comment
-addComment comment_content post_postId =
+addComment comment_comment_content post_postId =
     do b@Comments{..} <- get
        let comment = Comment { commentId = nextCommentId
-                             , comment_content  = comment_content
+                             , comment_content  = comment_comment_content
                              , postId = post_postId
                            }
        put $ b { nextCommentId = succ nextCommentId

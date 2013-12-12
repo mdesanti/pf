@@ -48,6 +48,7 @@ import Model.Blog
 import Model.Comment
 import Controller.Auth
 import Controller.Post
+import Controller.Comment
 import Acid
 
 ------------------------------------------ MAIN --------------------------------------------------------

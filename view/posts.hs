@@ -44,6 +44,7 @@ module View.Posts where
   import Happstack.Server.FileServe
   import System.Log.Logger
   import Model.Blog
+  import Model.Comment
   import View.Template
   import View.Comments
 
