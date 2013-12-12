@@ -46,6 +46,7 @@ module View.Posts where
   import Model.Blog
   import View.Template
 
+------------------------------------------ CREATE ONE POST --------------------------------------------
   createForm :: BlogPost -> String -> String -> ServerPart Response
   createForm (BlogPost (PostId key) title content) post_url error_message = ok $ toResponse $
       appTemplate "Programación Funcional" [] $ do
@@ -67,7 +68,9 @@ module View.Posts where
                 H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
                 H.input H.! A.type_ "submit" H.! A.value "Upload" H.! A.class_ "btn btn-primary"
 
+------------------------------------------ CREATE ONE POST --------------------------------------------
 
+------------------------------------------ SHOW ONE POST ----------------------------------------------
   buildShowResponse :: BlogPost -> ServerPart Response
   buildShowResponse (BlogPost key post_title post_content) = 
     ok (toResponse (
@@ -77,6 +80,7 @@ module View.Posts where
                 H.div H.! A.class_ "hero-unit" $ do
                   H.p (H.toHtml post_content)
                 buildDeleteLink key
+                createCommentForm key
                 H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
             )
       ))
@@ -89,7 +93,7 @@ module View.Posts where
 
   ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
-  ------------------------------------------ SHOW ALL POSTS ----------------------------------------------
+  ------------------------------------------ SHOW ALL POSTS ---------------------------------------------
 
   buildResponse :: [BlogPost] -> ServerPart Response
   buildResponse posts = 
@@ -103,4 +107,4 @@ module View.Posts where
   buildLink :: PostId -> H.Attribute
   buildLink (PostId key) = A.href (stringValue ("/posts/" ++ (show key)))
 
-  ------------------------------------------ SHOW ALL POSTS ----------------------------------------------
+  ------------------------------------------ SHOW ALL POSTS ---------------------------------------------

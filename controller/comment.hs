@@ -2,7 +2,7 @@
   GeneralizedNewtypeDeriving, MultiParamTypeClasses,
   TemplateHaskell, TypeFamilies, RecordWildCards #-}
 
-module View.Template where
+module Controller.Comment where
 
 import Control.Applicative  ((<$>), (<*>))
 import Control.Monad
@@ -43,27 +43,10 @@ import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
 import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
 import System.Log.Logger
+import View.Comments
+import Model.Comment
+import Acid
 
 
------------------------------------------- HTML/HEAD TEMPLATE ------------------------------------------
-appTemplate :: String -> [H.Html] -> H.Html -> H.Html
-appTemplate title headers body =
-    H.html $ do
-      H.link H.! A.rel "stylesheet" H.! A.type_ "text/css" H.! A.href "/static/css/bootstrap.css"
-      H.head $ do
-        H.title (H.toHtml title)
-        H.meta H.! A.httpEquiv "Content-Type"
-               H.! A.content "text/html;charset=utf-8"
-        sequence_ headers
-      H.body $ do
-        H.div H.! A.class_ "container" $ do
-          body
------------------------------------------- HTML/HEAD TEMPLATE ------------------------------------------
-
-
-
-
-
-
-
-          
+newCommentForm :: AcidState Comment -> AcidState Post -> H.Html
+newCommentForm acid_comment acid_post = createCommentForm (Comment (CommentId 0) "" (getPostId acid_comment)) "/create_comment" ""
