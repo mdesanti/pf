@@ -7,6 +7,5 @@ cabal-dev
 .virthualenv
 form_example.hs
 textarea.html
-acid.hs
 state/Blog/*
 server
