@@ -48,8 +48,8 @@ module View.Comments where
   import View.Template
 
 ------------------------------------------ CREATE ONE COMMENT --------------------------------------------
-  createCommentForm :: PostId -> String -> String -> H.Html
-  createCommentForm (PostId key) post_url error_message =
+  createCommentForm :: Comment -> String -> String -> H.Html
+  createCommentForm (Comment (CommentId key) comment_content (PostId post_key)) post_url error_message =
     H.div (H.h1 "New Comment") H.! A.class_ "page-header"
     H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
       H.! A.method "POST"
@@ -58,20 +58,16 @@ module View.Comments where
         H.div H.! A.class_ "control-group" $ do
           H.label "Comment" H.! A.class_ "control-label"
           H.div H.! A.class_ "controls" $ do  
-            H.textarea H.! A.type_ "text" H.! A.name "comment_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
+            H.textarea H.! A.type_ "text" H.! A.name "comment_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml comment_content)
         H.div H.! A.class_ "control-group" $ do
           H.div H.! A.class_ "controls" $ do  
-            H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
+            H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show post_key))
+            H.input H.! A.type_ "hidden" H.! A.name "comment_id" H.! A.value (stringValue (show key))
             H.input H.! A.type_ "submit" H.! A.value "Upload" H.! A.class_ "btn btn-primary"
 
 ------------------------------------------ CREATE ONE COMMENT --------------------------------------------
 
 --------------------------------------------- SHOW ALL COMMENTS  -----------------------------------------
 
-  buildCommentsIndex :: [Comment] -> H.Html
-  buildCommentsIndex comments = 
-          H.div (H.h1 "Comments") H.! A.class_ "page-header"
-          H.ul $ forM_ comments (H.li content)
-          H.a "Upload" H.! A.href "/upload_comment" H.! A.class_ "btn btn-primary"
 
---------------------------------------------- SHOW ALL POSTS ---------------------------------------------
+--------------------------------------------- SHOW ALL COMMENTS ---------------------------------------------

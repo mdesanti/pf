@@ -79,8 +79,8 @@ module View.Posts where
             (do H.div ( H.h1 (H.toHtml ("Showing " ++ post_title))) H.! A.class_ "page-header"
                 H.div H.! A.class_ "hero-unit" $ do
                   H.p (H.toHtml post_content)
+                buildEditLink key
                 buildDeleteLink key
-                createCommentForm key
                 H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
             )
       ))
@@ -89,8 +89,10 @@ module View.Posts where
   buildDeleteLink (PostId key) = H.form
                                   H.! A.method "POST"
                                   H.! A.action (stringValue ("/posts/delete/" ++ show key)) $ do
-                                     H.input H.! A.type_ "submit" H.! A.value "Delete" H.! A.class_ "btn btn-primary"
+                                     H.input H.! A.type_ "submit" H.! A.value "Delete" H.! A.class_ "btn btn-danger"
 
+  buildEditLink :: PostId -> H.Html
+  buildEditLink (PostId key) = H.a "Edit" H.! A.href (stringValue ("/update_post/" ++ (show key))) H.! A.class_ "btn btn-success"
   ------------------------------------------ SHOW ONE POST ----------------------------------------------
 
   ------------------------------------------ SHOW ALL POSTS ---------------------------------------------

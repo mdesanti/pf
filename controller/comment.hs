@@ -46,7 +46,3 @@ import System.Log.Logger
 import View.Comments
 import Model.Comment
 import Acid
-
-
-newCommentForm :: AcidState Comment -> AcidState Post -> H.Html
-newCommentForm acid_comment acid_post = createCommentForm (Comment (CommentId 0) "" (getPostId acid_comment)) "/create_comment" ""

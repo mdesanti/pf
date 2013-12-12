@@ -48,11 +48,11 @@ import Model.Blog
 
 newtype CommentId = CommentId { unCommentId :: Integer } deriving (Eq, Ord, Show, Read, Data, Enum, Typeable)
 
-data Comment = Comment { commentId :: CommentId, content :: String, postId :: PostId } deriving (Eq, Ord, Read, Show, Data, Typeable)
+data Comment = Comment { commentId :: CommentId, comment_content :: String, postId :: PostId } deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 isValidComment :: Comment -> Bool
 isValidComment (Comment _ [] _) = False
-isValidComment (Comment _ comment _) = True
+isValidComment (Comment _ comment_content _) = True
 
 instance Indexable Comment where
   empty = ixSet
@@ -65,10 +65,10 @@ data Comments = Comments
     deriving (Data, Typeable)
 
 getContent :: Comment -> String
-getContent (Comment _ content _) = content
+getContent (Comment _ comment_content _) = comment_content
 
 getPostId :: Comment -> PostId
-getPostId (Comment commentId content postId) = postId
+getPostId (Comment commentId comment_content postId) = postId
 
 
 

@@ -96,7 +96,7 @@ main =
                                                                                       showPost acid s))),
                                                     dir "update_post" ( do path ( (\s -> do 
                                                                                             myAuth
-                                                                                            method POST
+                                                                                            method GET
                                                                                             editForm acid s))),
                                                     seeOther ("/allPosts" :: String) (toResponse ())
                                                   ])))
