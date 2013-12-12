@@ -45,6 +45,7 @@ module View.Posts where
   import System.Log.Logger
   import Model.Blog
   import View.Template
+  import View.Comments
 
 ------------------------------------------ CREATE ONE POST --------------------------------------------
   createForm :: BlogPost -> String -> String -> ServerPart Response
@@ -82,6 +83,7 @@ module View.Posts where
                 buildEditLink key
                 buildDeleteLink key
                 H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
+                createCommentForm (Comment (CommentId 0) "" key) "create_post" ""
             )
       ))
 

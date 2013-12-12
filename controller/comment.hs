@@ -44,5 +44,17 @@ import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
 import System.Log.Logger
 import View.Comments
+import View.Posts
 import Model.Comment
 import Acid
+
+handleNewCommentForm :: AcidState Comment -> AcidState Blog -> ServerPart Response
+handleNewCommentForm acid post_acid =
+   do post_data <- getDataFn postRq
+      case post_data of
+        Left e -> badRequest (toResponse (Prelude.unlines e))
+        Right(Comment comment_id comment_content post_id) 
+                  | isValidComment (Comment comment_id comment_content post_id)  ->
+                    do (Comment (CommentId comment_id) comment_content (PostId post_id)) <- update' acid (AddComment comment_content (PostId post_id))
+                       return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
+                  | otherwise -> buildShowResponse query' post_acid (GetPost (PostId post_id))

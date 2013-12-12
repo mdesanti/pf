@@ -1,7 +1,6 @@
 dist
 cabal-dev
 *.o
-*.hi
 *.chi
 *.chs.h
 .virthualenv
@@ -9,3 +8,5 @@ form_example.hs
 textarea.html
 state/Blog/*
 server
+*/*.hi
+*.hi
