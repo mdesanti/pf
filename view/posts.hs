@@ -73,7 +73,7 @@ module View.Posts where
 ------------------------------------------ CREATE ONE POST --------------------------------------------
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
-  buildShowResponse :: BlogPost -> [Comments] -> ServerPart Response
+  buildShowResponse :: BlogPost -> [Comment] -> ServerPart Response
   buildShowResponse (BlogPost key post_title post_content) comments = 
     ok (toResponse (
           appTemplate "Programación Funcional"

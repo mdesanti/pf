@@ -89,7 +89,9 @@ showPost :: AcidState Blog -> AcidState Comments -> Integer -> ServerPart Respon
 showPost acid comment_acid post_id =
             do post <- query' acid (GetPost (PostId post_id))
                case post of
-                  Just post -> buildShowResponse post (query' comment_acid (GetCommentsForPost (PostId post_id)))
+                  Just post -> do
+                                comments <- query' comment_acid (GetCommentsForPost (PostId post_id))
+                                buildShowResponse post comments
                   Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 handleDeletePost :: AcidState Blog -> Integer -> ServerPart Response

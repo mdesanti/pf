@@ -109,7 +109,7 @@ getCommentsForPost :: PostId -> Query Comments [Comment]
 getCommentsForPost postId = 
     do Comments{..} <- ask
        let all_comments = IxSet.toList comments
-       return (Prelude.filter (\c -> (getPostId c) == postId) all_comments)
+       return (Prelude.filter (\c -> (getPostId c) /= postId) all_comments)
 
 
 $(makeAcidic ''Comments ['addComment, 'getCommentsForPost])
