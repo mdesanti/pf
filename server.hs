@@ -84,9 +84,8 @@ main =
                                                                           method POST
                                                                           handleNewForm acid),
                                                     dir "create_comment" (do 
-                                                                          myAuth
-                                                                          method POST
-                                                                          handleNewCommentForm commentAcid acid),
+                                                                            method POST
+                                                                            handleNewCommentForm commentAcid acid),
                                                     dir "update_post" (do 
                                                                           myAuth
                                                                           method POST
