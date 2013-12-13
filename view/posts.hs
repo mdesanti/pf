@@ -73,8 +73,8 @@ module View.Posts where
 ------------------------------------------ CREATE ONE POST --------------------------------------------
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
-  buildShowResponse :: BlogPost -> ServerPart Response
-  buildShowResponse (BlogPost key post_title post_content) = 
+  buildShowResponse :: BlogPost -> [Comments] -> ServerPart Response
+  buildShowResponse (BlogPost key post_title post_content) comments = 
     ok (toResponse (
           appTemplate "Programación Funcional"
             []
@@ -85,6 +85,7 @@ module View.Posts where
                 buildDeleteLink key
                 H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
                 createCommentForm (Comment (CommentId 0) "" key) "create_post" ""
+                showComments comments
             )
       ))
 

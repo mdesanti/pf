@@ -68,6 +68,9 @@ module View.Comments where
 ------------------------------------------ CREATE ONE COMMENT --------------------------------------------
 
 --------------------------------------------- SHOW ALL COMMENTS  -----------------------------------------
-
+  showComments :: [Comment] -> H.Html
+  showComments comments = 
+    --H.div (H.h1 "Posts") H.! A.class_ "page-header"
+    H.h1 "234234"
 
 --------------------------------------------- SHOW ALL COMMENTS ---------------------------------------------

@@ -97,7 +97,7 @@ main =
                                                                                                   method POST
                                                                                                   handleDeletePost acid s)))),
                                                     dir "posts" ( do path ( (\s -> do method GET
-                                                                                      showPost acid s))),
+                                                                                      showPost acid commentAcid s))),
                                                     dir "update_post" ( do path ( (\s -> do 
                                                                                             myAuth
                                                                                             method GET

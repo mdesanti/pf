@@ -45,6 +45,7 @@ import Happstack.Server.FileServe
 import System.Log.Logger
 import View.Posts
 import Model.Blog
+import Model.Comment
 import Acid
 
 
@@ -84,11 +85,11 @@ handleEditForm acid =
                   | otherwise -> createForm (BlogPost (PostId 0) "" "") "/create_post" "Title or Content can not be empty"
 
 
-showPost :: AcidState Blog -> Integer -> ServerPart Response
-showPost acid post_id =
+showPost :: AcidState Blog -> AcidState Comments -> Integer -> ServerPart Response
+showPost acid comment_acid post_id =
             do post <- query' acid (GetPost (PostId post_id))
                case post of
-                  Just post -> buildShowResponse post
+                  Just post -> buildShowResponse post (query' comment_acid (GetCommentsForPost (PostId post_id)))
                   Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 handleDeletePost :: AcidState Blog -> Integer -> ServerPart Response
