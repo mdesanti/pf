@@ -49,20 +49,23 @@ import Model.Comment
 import Model.Blog
 import Acid
 
-handleNewCommentForm :: AcidState Comment -> AcidState Blog -> ServerPart Response
+handleNewCommentForm :: AcidState Comments -> AcidState Blog -> ServerPart Response
 handleNewCommentForm acid post_acid =
    do post_data <- getDataFn commentRq
       case post_data of
         Left e -> badRequest (toResponse (Prelude.unlines e))
         Right(Comment comment_id comment_content post_id) 
                   | isValidComment (Comment comment_id comment_content post_id)  ->
-                    do (Comment (CommentId comment_id) comment_content (PostId post_id)) <- update' acid (AddComment comment_content (PostId post_id))
+                    do (Comment (CommentId comment_id) comment_content (PostId post_id)) <- update' acid (AddComment comment_content post_id)
                        return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
-                  | otherwise -> buildShowResponse query' post_acid (GetPost (PostId post_id))
+                  | otherwise -> do post <- query' post_acid (GetPost (PostId post_id))
+                      case post of
+                        Just (BlogPost a b c) -> buildShowResponse (BlogPost a b c)
+                        Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 commentRq :: RqData Comment
 commentRq = do
           commentId <- lookRead "comment_id"
           content <- look "comment_content"
           postId <- lookRead "post_id"
-          return (Comment (Comment commentId) content (PostId post_id))
+          return (Comment (CommentId commentId) content (PostId postId))

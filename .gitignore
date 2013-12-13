@@ -6,7 +6,7 @@ cabal-dev
 .virthualenv
 form_example.hs
 textarea.html
-state/Blog/*
+state/*/*
 server
 */*.hi
 *.hi
