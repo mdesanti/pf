@@ -70,7 +70,6 @@ module View.Comments where
 --------------------------------------------- SHOW ALL COMMENTS  -----------------------------------------
   showComments :: [Comment] -> H.Html
   showComments comments = 
-    --H.div (H.h1 "Posts") H.! A.class_ "page-header"
-    H.h1 "234234"
+    H.ul $ forM_ comments (H.li . (\(Comment key content post_key) -> H.toHtml content))
 
 --------------------------------------------- SHOW ALL COMMENTS ---------------------------------------------

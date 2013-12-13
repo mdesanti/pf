@@ -84,7 +84,7 @@ module View.Posts where
                 buildEditLink key
                 buildDeleteLink key
                 H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
-                createCommentForm (Comment (CommentId 0) "" key) "create_post" ""
+                createCommentForm (Comment (CommentId 0) "" key) "create_comment" ""
                 showComments comments
             )
       ))

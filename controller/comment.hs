@@ -51,7 +51,8 @@ import Acid
 
 handleNewCommentForm :: AcidState Comments -> AcidState Blog -> ServerPart Response
 handleNewCommentForm acid post_acid =
-   do post_data <- getDataFn commentRq
+   do
+      post_data <- getDataFn commentRq
       case post_data of
         Left e -> badRequest (toResponse (Prelude.unlines e))
         Right(Comment comment_id comment_content post_id) 
@@ -62,7 +63,7 @@ handleNewCommentForm acid post_acid =
                                     case post of
                                       Just (BlogPost a b c) -> do
                                                                 comments <- query' acid (GetCommentsForPost post_id)
-                                                                buildShowResponse (BlogPost a b c) comments
+                                                                seeOther ("posts/4" :: String) (toResponse ())
                                       Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 commentRq :: RqData Comment
