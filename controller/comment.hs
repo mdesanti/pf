@@ -63,7 +63,7 @@ handleNewCommentForm acid post_acid =
                                     case post of
                                       Just (BlogPost a b c) -> do
                                                                 comments <- query' acid (GetCommentsForPost post_id)
-                                                                seeOther ("posts/4" :: String) (toResponse ())
+                                                                buildShowResponse (BlogPost a b c) comments
                                       Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 commentRq :: RqData Comment

@@ -52,7 +52,7 @@ module View.Posts where
   createForm :: BlogPost -> String -> String -> ServerPart Response
   createForm (BlogPost (PostId key) title content) post_url error_message = ok $ toResponse $
       appTemplate "Programación Funcional" [] $ do
-        H.div (H.h1 "New Post") H.! A.class_ "page-header"
+        H.div (H.h1 "Post Form") H.! A.class_ "page-header"
         H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
           H.! A.method "POST"
           H.! A.action (stringValue post_url) $ do
@@ -69,6 +69,7 @@ module View.Posts where
               H.div H.! A.class_ "controls" $ do  
                 H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
                 H.input H.! A.type_ "submit" H.! A.value "Upload" H.! A.class_ "btn btn-primary"
+        H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
 
 ------------------------------------------ CREATE ONE POST --------------------------------------------
 
@@ -81,11 +82,12 @@ module View.Posts where
             (do H.div ( H.h1 (H.toHtml ("Showing " ++ post_title))) H.! A.class_ "page-header"
                 H.div H.! A.class_ "hero-unit" $ do
                   H.p (H.toHtml post_content)
+                H.div ( H.h1 ("Comments"))
+                showComments comments
+                createCommentForm (Comment (CommentId 0) "" key) "create_comment" ""
                 buildEditLink key
                 buildDeleteLink key
                 H.a "Back" H.! A.href "/allPosts" H.! A.class_ "btn"
-                createCommentForm (Comment (CommentId 0) "" key) "create_comment" ""
-                showComments comments
             )
       ))
 
@@ -106,7 +108,7 @@ module View.Posts where
     ok (toResponse (
           appTemplate "Programación Funcional" [] $ do
             H.div (H.h1 "Posts") H.! A.class_ "page-header"
-            H.ul $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title))
+            H.ul H.! A.class_ "unstyled" $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title)) H.! A.class_ "alert alert-success"
             H.a "Upload" H.! A.href "/upload" H.! A.class_ "btn btn-primary"
       ))
 
