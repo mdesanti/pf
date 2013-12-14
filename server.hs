@@ -77,7 +77,7 @@ main =
                                                                     handleLogin),
                                                     dir "upload" (do
                                                                     myAuth
-                                                                    methodM [GET, HEAD] 
+                                                                    method GET 
                                                                     newForm acid),
                                                     dir "create_post" (do 
                                                                           myAuth
@@ -105,12 +105,10 @@ main =
                                                     seeOther ("/allPosts" :: String) (toResponse ())
                                                   ])))
 ------------------------------------------ MAIN --------------------------------------------------------
-
+myAuth :: ServerPart ()
 myAuth = do
           userCookie <- (lookCookieValue "User")
-          if (userCookie == "valid")
-            then return ()
-            else mzero
+          guard (userCookie == "valid")
 
 initialBlogState :: Blog
 initialBlogState =
