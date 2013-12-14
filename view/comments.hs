@@ -50,14 +50,13 @@ module View.Comments where
 ------------------------------------------ CREATE ONE COMMENT --------------------------------------------
   createCommentForm :: Comment -> String -> String -> H.Html
   createCommentForm (Comment (CommentId key) comment_content (PostId post_key)) post_url error_message =
-    H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
+    H.form H.! A.enctype "multipart/form-data"
       H.! A.method "POST"
       H.! A.action (stringValue post_url) $ do
         H.p (H.toHtml error_message)
         H.div H.! A.class_ "control-group" $ do
-          H.label "Comment" H.! A.class_ "control-label"
           H.div H.! A.class_ "controls" $ do  
-            H.textarea H.! A.type_ "text" H.! A.name "comment_content" H.! A.cols (H.toValue (120 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml comment_content)
+            H.textarea H.! A.style "resize:none" H.! A.type_ "text" H.! A.name "comment_content" H.! A.cols (H.toValue (120 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml comment_content)
         H.div H.! A.class_ "control-group" $ do
           H.div H.! A.class_ "controls" $ do  
             H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show post_key))

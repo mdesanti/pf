@@ -81,7 +81,7 @@ handleEditForm acid =
         Right(BlogPost (PostId post_id) post_title post_content)
                   | isValidBlog (BlogPost (PostId post_id) post_title post_content) -> 
                     do post <- update' acid (UpdatePost (BlogPost (PostId post_id) post_title post_content))
-                       return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
+                       return (redirect 302 ("/posts/" ++ show post_id) (toResponse ()))
                   | otherwise -> createForm (BlogPost (PostId 0) "" "") "/create_post" "Title or Content can not be empty"
 
 
@@ -100,7 +100,7 @@ handleDeletePost acid post_id =
                case to_delete of
                 Just blog_post -> do 
                                     update' acid (DeletePost blog_post)
-                                    return (redirect 302 (show "allPosts") (toResponse ()))
+                                    return (redirect 302 ("/allPosts" :: String) (toResponse ()))
                 Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 handleAllPosts :: AcidState Blog -> ServerPart Response

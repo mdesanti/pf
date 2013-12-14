@@ -58,7 +58,7 @@ handleNewCommentForm acid post_acid =
         Right(Comment comment_id comment_content post_id) 
                   | isValidComment (Comment comment_id comment_content post_id)  ->
                     do (Comment (CommentId comment_id) comment_content (PostId post_id)) <- update' acid (AddComment comment_content post_id)
-                       return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
+                       return (redirect 302 ("/posts/" ++ show post_id) (toResponse ()))
                   | otherwise -> do post <- query' post_acid (GetPost post_id)
                                     case post of
                                       Just (BlogPost a b c) -> do
