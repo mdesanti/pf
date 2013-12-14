@@ -58,12 +58,12 @@ handleNewCommentForm acid post_acid =
         Right(Comment comment_id comment_content post_id) 
                   | isValidComment (Comment comment_id comment_content post_id)  ->
                     do (Comment (CommentId comment_id) comment_content (PostId post_id)) <- update' acid (AddComment comment_content post_id)
-                       return (redirect 302 ("posts/" ++ show post_id) (toResponse ()))
+                       return (redirect 302 ("/posts/" ++ show post_id) (toResponse ()))
                   | otherwise -> do post <- query' post_acid (GetPost post_id)
                                     case post of
                                       Just (BlogPost a b c) -> do
                                                                 comments <- query' acid (GetCommentsForPost post_id)
-                                                                seeOther ("posts/4" :: String) (toResponse ())
+                                                                buildShowResponse (BlogPost a b c) comments
                                       Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 commentRq :: RqData Comment
