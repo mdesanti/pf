@@ -43,16 +43,17 @@ import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
 import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
 import System.Log.Logger
+import Model.User
 
 
 newtype PostId = PostId { unPostId :: Integer } deriving (Eq, Ord, Show, Read, Data, Enum, Typeable)
 
-data BlogPost = BlogPost { postId :: PostId, title :: String, content :: String } deriving (Eq, Ord, Read, Show, Data, Typeable)
+data BlogPost = BlogPost { postId :: PostId, title :: String, content :: String, owner :: UserId } deriving (Eq, Ord, Read, Show, Data, Typeable)
 
 isValidBlog :: BlogPost -> Bool
-isValidBlog (BlogPost _ [] _) = False
-isValidBlog (BlogPost _ _ []) = False
-isValidBlog (BlogPost _ t c) = True
+isValidBlog (BlogPost _ [] _ _) = False
+isValidBlog (BlogPost _ _ [] _) = False
+isValidBlog (BlogPost _ t c _) = True
 
 instance Indexable BlogPost where
   empty = ixSet
@@ -64,10 +65,10 @@ data Blog = Blog
     }
     deriving (Data, Typeable)
 
-getName (BlogPost _ title content) = title
-getContent (BlogPost _ title content) = content
-getId (BlogPost key _ _) = key
-
+getName (BlogPost _ title content _) = title
+getContent (BlogPost _ title content _) = content
+getId (BlogPost key _ _ _) = key
+getOwnerId (BlogPost _ _ _ owner) = owner
 
 
 

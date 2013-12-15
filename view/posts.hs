@@ -50,7 +50,7 @@ module View.Posts where
 
 ------------------------------------------ CREATE ONE POST --------------------------------------------
   createForm :: BlogPost -> String -> String -> ServerPart Response
-  createForm (BlogPost (PostId key) title content) post_url error_message = ok $ toResponse $
+  createForm (BlogPost (PostId key) title content owner) post_url error_message = ok $ toResponse $
       appTemplate "Programación Funcional" [] $ do
         H.div (H.h1 "Post Form") H.! A.class_ "page-header"
         H.form H.! A.enctype "multipart/form-data" H.! A.class_ "form-horizontal" 
@@ -79,7 +79,7 @@ module View.Posts where
 
 ------------------------------------------ SHOW ONE POST ----------------------------------------------
   buildShowResponse :: BlogPost -> [Comment] -> ServerPart Response
-  buildShowResponse (BlogPost key post_title post_content) comments = 
+  buildShowResponse (BlogPost key post_title post_content owner) comments = 
     ok (toResponse (
           appTemplate "Programación Funcional"
             []
@@ -112,7 +112,7 @@ module View.Posts where
     ok (toResponse (
           appTemplate "Programación Funcional" [] $ do
             H.div (H.h1 "Posts") H.! A.class_ "page-header"
-            H.ul H.! A.class_ "unstyled" $ forM_ posts (H.li . (\(BlogPost key title content) -> H.a H.! (buildLink key) $ H.toHtml title)) H.! A.class_ "alert alert-success"
+            H.ul H.! A.class_ "unstyled" $ forM_ posts (H.li . (\(BlogPost key title content owner) -> H.a H.! (buildLink key) $ H.toHtml title)) H.! A.class_ "alert alert-success"
             H.a "Upload" H.! A.href "/upload" H.! A.class_ "btn btn-primary"
       ))
 

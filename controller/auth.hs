@@ -64,7 +64,7 @@ module Controller.Auth where
                                                   then do 
                                                         addCookie Session (mkCookie "User" user)
                                                         addCookie Session (mkCookie "Password" pass)
-                                                        return (redirect 302 ("allPosts" :: String) (toResponse ()))
+                                                        return (redirect 302 (show "/allPosts") (toResponse ()))
                                                   else do
                                                         errorHandler "Invalid username or password"
 

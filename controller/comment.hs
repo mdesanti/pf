@@ -61,9 +61,9 @@ handleNewCommentForm acid post_acid =
                        return (redirect 302 ("/posts/" ++ show post_id) (toResponse ()))
                   | otherwise -> do post <- query' post_acid (GetPost post_id)
                                     case post of
-                                      Just (BlogPost a b c) -> do
+                                      Just (BlogPost a b c d) -> do
                                                                 comments <- query' acid (GetCommentsForPost post_id)
-                                                                buildShowResponse (BlogPost a b c) comments
+                                                                buildShowResponse (BlogPost a b c d) comments
                                       Nothing -> badRequest (toResponse (("Could not find post with id " ++ show post_id) :: String))
 
 commentRq :: RqData Comment

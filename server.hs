@@ -5,6 +5,7 @@
 module Main where
 
 import Control.Applicative  ((<$>), (<*>))
+import Control.Monad.Trans.Maybe
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Reader ( ask )
@@ -14,7 +15,8 @@ import Happstack.Server(Method(GET, HEAD, POST, DELETE), dir, methodM, ServerPar
                         defaultBodyPolicy, BodyPolicy, decodeBody, RqData,
                         getDataFn, badRequest, lookFile, path, resp, seeOther, method,
                         getHeaderM, unauthorized, setHeaderM, askRq, getHeader, lookCookieValue,
-                        CookieLife(Session), addCookie, mkCookie, HasRqData, askRqEnv, cookieValue)
+                        CookieLife(Session), addCookie, mkCookie, HasRqData, askRqEnv, cookieValue,
+                        readCookieValue, lookCookie, Cookie(..))
 import           Text.Blaze
 import           Text.Blaze.Internal
 import qualified Text.Blaze.Html4.Strict as H
@@ -125,7 +127,6 @@ myAuth acid = do
           passwordCookie <- (lookCookieValue "Password")
           exists <- query' acid (UserExists userCookie passwordCookie)
           guard (exists)
-
 
 initialBlogState :: Blog
 initialBlogState =

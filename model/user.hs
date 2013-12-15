@@ -43,7 +43,6 @@ import Data.IxSet           ( Indexable(..), IxSet(..), (@=)
 import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
 import System.Log.Logger
-import Model.Blog
 
 
 newtype UserId = UserId { unUserId :: Integer } deriving (Eq, Ord, Show, Read, Data, Enum, Typeable)

@@ -50,12 +50,13 @@ $(deriveSafeCopy 0 'base ''PostId)
 $(deriveSafeCopy 0 'base ''BlogPost)
 $(deriveSafeCopy 0 'base ''Blog)
 
-addPost :: String -> String -> Update Blog BlogPost
-addPost post_title post_content =
+addPost :: String -> String -> UserId -> Update Blog BlogPost
+addPost post_title post_content userId =
     do b@Blog{..} <- get
        let post = BlogPost { postId = nextPostId
                              , title  = post_title
-                             , content = post_content
+                             , content = post_content,
+                             owner = userId
                            }
        put $ b { nextPostId = succ nextPostId
                , posts      = IxSet.insert post posts
@@ -75,10 +76,10 @@ allPosts = do
              return all_posts
 
 updatePost :: BlogPost -> Update Blog ()
-updatePost (BlogPost key title content) = do
+updatePost (BlogPost key title content owner) = do
   b@Blog{..} <- get
   put $ b { posts =
-             IxSet.updateIx key (BlogPost key title content) posts
+             IxSet.updateIx key (BlogPost key title content owner) posts
           }
 deletePost :: BlogPost -> Update Blog ()
 deletePost post = do
@@ -133,10 +134,15 @@ addUser new_username new_password =
        return user
 
 
-getUser :: String -> Query Users (Maybe User)
-getUser username = 
-    do Users{..} <- ask
-       return (getOne (users @= username))
+getUser :: String -> String -> Query Users (Maybe User)
+getUser username password = 
+  do 
+    Users{..} <- ask
+    let all_users = IxSet.toList users
+    let result = (Prelude.filter (\(User key user pass) -> username == user && pass == password) all_users)
+    if((Prelude.length result) == 0) 
+    then return(Nothing)
+    else return (Just (Prelude.head result))
 
 allUsers :: Query Users [User]
 allUsers = do
