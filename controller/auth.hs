@@ -42,42 +42,40 @@ module Controller.Auth where
                               , Proxy(..), getOne, ixFun, ixSet )
   import qualified Data.IxSet as IxSet
   import View.Login
+  import Model.User
+  import Acid
 
 
   login:: ServerPart Response
   login = createLoginForm ""
 
-  handleLogin :: ServerPart Response
-  handleLogin = checkAuth createLoginForm
+  handleLogin :: AcidState Users -> ServerPart Response
+  handleLogin acid = checkAuth acid createLoginForm
 
 
-  checkAuth :: (String -> ServerPart Response) -> ServerPart Response
-  checkAuth errorHandler = do
+  checkAuth :: AcidState Users -> (String -> ServerPart Response) -> ServerPart Response
+  checkAuth acid errorHandler = do
        d <- getDataFn authInfo
        case d of
            (Left e) -> errorHandler (Prelude.unlines e)
-           (Right a) | isValid a -> do
-                                      addCookie Session (mkCookie "User" "valid")
-                                      return (redirect 302 ("allPosts" :: String) (toResponse ()))
-           (Right a) | otherwise -> errorHandler "Invalid username or password"
+           (Right (AuthCredentials user pass))-> do
+                                                  exists <- query' acid (UserExists user pass)
+                                                  if exists
+                                                  then do 
+                                                        addCookie Session (mkCookie "User" user)
+                                                        addCookie Session (mkCookie "Password" pass)
+                                                        return (redirect 302 ("allPosts" :: String) (toResponse ()))
+                                                  else do
+                                                        errorHandler "Invalid username or password"
+
 
 
   data AuthCredentials = AuthCredentials { username :: String,  password :: String }
-
-  isValid :: AuthCredentials -> Bool
-  isValid (AuthCredentials username password) = username == "admin" && password == "admin"
 
   authInfo :: RqData AuthCredentials
   authInfo = do
        username <- look "username"
        password <- look "password"
        return (AuthCredentials username password)
-
-  isLoggedIn :: ServerPart Bool
-  isLoggedIn = do
-                d <- getDataFn authInfo
-                case d of
-                  Left e  -> mzero 
-                  Right a -> return (isValid a)
 
 

@@ -138,8 +138,20 @@ getUser username =
     do Users{..} <- ask
        return (getOne (users @= username))
 
+allUsers :: Query Users [User]
+allUsers = do
+             Users{..} <- ask
+             let all_users = IxSet.toList users
+             return all_users
 
-$(makeAcidic ''Users ['addUser, 'getUser])
+userExists :: String -> String -> Query Users Bool
+userExists username password = do
+                                Users{..} <- ask
+                                let all_users = IxSet.toList users
+                                return (Prelude.foldr (\(User key user pass) rec -> (username == user && pass == password) || rec) False all_users)
+
+
+$(makeAcidic ''Users ['addUser, 'getUser, 'allUsers, 'userExists])
 
 
 

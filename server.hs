@@ -51,6 +51,7 @@ import Model.User
 import Controller.Auth
 import Controller.Post
 import Controller.Comment
+import Controller.User
 import Acid
 
 ------------------------------------------ MAIN --------------------------------------------------------
@@ -72,47 +73,58 @@ main =
                                                             (\acid -> simpleHTTP nullConf (
                                                                 do decodeBody myPolicy
                                                                    msum [ 
-                                                                          dir "static" (serveDirectory DisableBrowsing [] "public"), 
+                                                                          dir "static" (serveDirectory DisableBrowsing [] "public"),
+                                                                          dir "register" (do
+                                                                                            method GET
+                                                                                            register),
+                                                                          dir "register" (do
+                                                                                            method POST
+                                                                                            handleRegister userAcid),
+                                                                          dir "users" (do
+                                                                                         method GET
+                                                                                         listUsers userAcid),
                                                                           dir "login" (do
                                                                                         method GET
                                                                                         login),
                                                                           dir "login" (do
                                                                                           method POST
-                                                                                          handleLogin),
+                                                                                          handleLogin userAcid),
                                                                           dir "upload" (do
-                                                                                          myAuth
+                                                                                          myAuth userAcid
                                                                                           method GET 
                                                                                           newForm acid),
                                                                           dir "create_post" (do 
-                                                                                                myAuth
+                                                                                                myAuth userAcid
                                                                                                 method POST
                                                                                                 handleNewForm acid),
                                                                           dir "posts" ( dir "create_comment" (do 
                                                                                                   method POST
                                                                                                   handleNewCommentForm commentAcid acid)),
                                                                           dir "update_post" (do 
-                                                                                                myAuth
+                                                                                                myAuth userAcid
                                                                                                 method POST
                                                                                                 handleEditForm acid),
                                                                           dir "allPosts" (do method GET
                                                                                              handleAllPosts acid),
                                                                           dir "posts" ( dir "delete" ( path ( (\s -> do 
-                                                                                                                        myAuth
+                                                                                                                        myAuth userAcid
                                                                                                                         method POST
                                                                                                                         handleDeletePost acid s)))),
                                                                           dir "posts" ( do path ( (\s -> do method GET
                                                                                                             showPost acid commentAcid s))),
                                                                           dir "update_post" ( do path ( (\s -> do 
-                                                                                                                  myAuth
+                                                                                                                  myAuth userAcid
                                                                                                                   method GET
                                                                                                                   editForm acid s))),
                                                                           seeOther ("/allPosts" :: String) (toResponse ())
                                                                         ]))))
 ------------------------------------------ MAIN --------------------------------------------------------
-myAuth :: ServerPart ()
-myAuth = do
+myAuth :: AcidState Users -> ServerPart ()
+myAuth acid = do
           userCookie <- (lookCookieValue "User")
-          guard (userCookie == "valid")
+          passwordCookie <- (lookCookieValue "Password")
+          exists <- query' acid (UserExists userCookie passwordCookie)
+          guard (exists)
 
 
 initialBlogState :: Blog
