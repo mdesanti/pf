@@ -44,6 +44,7 @@ import qualified Data.IxSet as IxSet
 import Happstack.Server.FileServe
 import Model.Blog
 import Model.Comment
+import Model.User
 
 $(deriveSafeCopy 0 'base ''PostId)
 $(deriveSafeCopy 0 'base ''BlogPost)
@@ -114,6 +115,31 @@ getCommentsForPost postId =
 
 
 $(makeAcidic ''Comments ['addComment, 'getCommentsForPost])
+
+$(deriveSafeCopy 0 'base ''UserId)
+$(deriveSafeCopy 0 'base ''User)
+$(deriveSafeCopy 0 'base ''Users)
+
+addUser :: String -> String -> Update Users User
+addUser new_username new_password =
+    do b@Users{..} <- get
+       let user = User { userId = nextUserId
+                         , username  = new_username
+                             , password = new_password
+                           }
+       put $ b { nextUserId = succ nextUserId
+               , users      = IxSet.insert user users
+               }
+       return user
+
+
+getUser :: String -> Query Users (Maybe User)
+getUser username = 
+    do Users{..} <- ask
+       return (getOne (users @= username))
+
+
+$(makeAcidic ''Users ['addUser, 'getUser])
 
 
 

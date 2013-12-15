@@ -64,7 +64,11 @@ module View.Posts where
             H.div H.! A.class_ "control-group" $ do
               H.label "Post Content" H.! A.class_ "control-label"
               H.div H.! A.class_ "controls" $ do  
-                H.textarea H.! A.style "resize:none" H.! A.type_ "text" H.! A.name "post_content" H.! A.cols (H.toValue (60 ::Integer)) H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
+                H.textarea H.! A.style "resize:none" 
+                           H.! A.type_ "text" 
+                           H.! A.name "post_content" 
+                           H.! A.cols (H.toValue (60 ::Integer)) 
+                           H.! A.rows (H.toValue (10 ::Integer)) $ (H.toHtml content)
             H.div H.! A.class_ "control-group" $ do
               H.div H.! A.class_ "controls" $ do  
                 H.input H.! A.type_ "hidden" H.! A.name "post_id" H.! A.value (stringValue (show key))
